@@ -1,0 +1,167 @@
+// Cross-Reference Engine for Quora - Search API Based
+// Uses Bing Web Search (primary) + Google CSE (secondary)
+// No AI/LLM - direct search API for real URLs
+
+import { expandQuery, buildSearchQueries } from './queryExpander.js'
+import { searchBingMultiQuery } from './bingSearch.js'
+import { searchGoogleCSEMultiQuery } from './googleCSE.js'
+import { processSearchResults } from './urlProcessor.js'
+import { withCache } from './quoraSearchCache.js'
+
+/**
+ * Check which search APIs are configured
+ */
+function getConfiguredAPIs() {
+  return {
+    bing: !!process.env.BING_API_KEY,
+    google: !!process.env.GOOGLE_CSE_API_KEY && !!process.env.GOOGLE_CSE_ID
+  }
+}
+
+/**
+ * Main Quora search function using Search APIs
+ * 
+ * Workflow:
+ * 1. Expand user query into variants
+ * 2. Build search queries with site:quora.com
+ * 3. Execute Bing search (if configured)
+ * 4. Execute Google CSE search (if configured)
+ * 5. Process, deduplicate, validate URLs
+ * 6. Return aggregated results
+ * 
+ * @param {string} query - User's search query
+ * @param {Object} options - Search options
+ * @returns {Promise<Object>} Search results with questions and stats
+ */
+export async function crossReferenceQuoraSearch(query, options = {}) {
+  // Auto-detect configured APIs
+  const configuredAPIs = getConfiguredAPIs()
+  
+  console.log('\n========================================')
+  console.log('QUORA SEARCH API WORKFLOW')
+  console.log('Query:', query)
+  console.log('Configured APIs:', 
+    configuredAPIs.bing ? '✅ Bing' : '❌ Bing',
+    configuredAPIs.google ? '✅ Google' : '❌ Google'
+  )
+  console.log('========================================\n')
+  
+  // Check if at least one API is configured
+  if (!configuredAPIs.bing && !configuredAPIs.google) {
+    console.error('❌ No search APIs configured! Add BING_API_KEY or GOOGLE_CSE_API_KEY to .env')
+    return {
+      questions: [],
+      stats: { total: 0, bing: 0, google: 0, multiSource: 0 },
+      query,
+      error: 'No search APIs configured. Please add API keys to .env file.'
+    }
+  }
+  
+  const {
+    useBing = configuredAPIs.bing,  // Auto-detect
+    useGoogle = configuredAPIs.google,  // Auto-detect
+    maxVariants = 6,
+    resultsPerQuery = 20,
+    limit = 50,
+    useCache = true
+  } = options
+  
+  // Use cache wrapper
+  const searchFn = async () => {
+    // Step 1: Expand query into variants
+    console.log('📝 Step 1: Query Expansion')
+    const variants = expandQuery(query, maxVariants)
+    
+    // Step 2: Build search queries with site:quora.com prefix
+    console.log('\n🔍 Step 2: Building Search Queries')
+    const searchQueries = buildSearchQueries(variants)
+    console.log(`   Generated ${searchQueries.length} search queries`)
+    
+    // Step 3 & 4: Execute searches in parallel
+    console.log('\n🌐 Step 3-4: Executing Searches')
+    
+    const searchPromises = []
+    
+    if (useBing) {
+      searchPromises.push(
+        searchBingMultiQuery(searchQueries, resultsPerQuery)
+          .catch(err => {
+            console.error('Bing search failed:', err.message)
+            return { results: [], source: 'bing' }
+          })
+      )
+    }
+    
+    if (useGoogle) {
+      searchPromises.push(
+        searchGoogleCSEMultiQuery(searchQueries, Math.min(resultsPerQuery, 10))
+          .catch(err => {
+            console.error('Google CSE search failed:', err.message)
+            return { results: [], source: 'google' }
+          })
+      )
+    }
+    
+    const searchResults = await Promise.all(searchPromises)
+    
+    // Separate results by source
+    const bingResults = searchResults.find(r => r.source === 'bing')?.results || []
+    const googleResults = searchResults.find(r => r.source === 'google')?.results || []
+    
+    // Step 5: Process, normalize, deduplicate, validate
+    console.log('\n🔧 Step 5: Processing Results')
+    const { questions, stats } = processSearchResults(bingResults, googleResults)
+    
+    // Step 6: Limit results
+    const limitedQuestions = questions.slice(0, limit)
+    
+    // Final stats
+    const finalStats = {
+      total: limitedQuestions.length,
+      bing: limitedQuestions.filter(q => q.sources.includes('bing')).length,
+      google: limitedQuestions.filter(q => q.sources.includes('google')).length,
+      multiSource: limitedQuestions.filter(q => q.sources.length > 1).length,
+      queriesExecuted: searchQueries.length
+    }
+    
+    // Log results
+    console.log('\n--- TOP 5 RESULTS ---')
+    limitedQuestions.slice(0, 5).forEach((q, i) => {
+      console.log(`${i + 1}. [${q.sources.join('+')}] ${q.title?.substring(0, 60)}...`)
+    })
+    console.log('\n--- STATS ---')
+    console.log(`Total: ${finalStats.total} | Bing: ${finalStats.bing} | Google: ${finalStats.google} | Multi: ${finalStats.multiSource}`)
+    console.log('========================================\n')
+    
+    return {
+      questions: limitedQuestions,
+      stats: finalStats,
+      query,
+      variants
+    }
+  }
+  
+  // Execute with or without cache
+  if (useCache) {
+    return await withCache(query, searchFn)
+  } else {
+    return await searchFn()
+  }
+}
+
+/**
+ * Get search configuration status
+ * @returns {Object} Configuration status for Bing and Google
+ */
+export function getSearchConfigStatus() {
+  return {
+    bing: {
+      configured: !!process.env.BING_API_KEY,
+      name: 'Bing Web Search API'
+    },
+    google: {
+      configured: !!process.env.GOOGLE_CSE_API_KEY && !!process.env.GOOGLE_CSE_ID,
+      name: 'Google Custom Search API'
+    }
+  }
+}
