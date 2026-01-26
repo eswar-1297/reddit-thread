@@ -48,6 +48,30 @@ function isRelevantToQuery(thread, query) {
   return matchedTerms.length >= Math.min(minRequired, searchTerms.length)
 }
 
+// Check if thread should be excluded (archived, locked, or mentions CloudFuze)
+function shouldExcludeThread(thread) {
+  // Filter out archived threads (can't comment on them)
+  if (thread.archived) {
+    return true
+  }
+  
+  // Filter out locked threads (can't comment on them)
+  if (thread.locked) {
+    return true
+  }
+  
+  // Filter out threads that mention CloudFuze (already have content)
+  const title = (thread.title || '').toLowerCase()
+  const selftext = (thread.selftext || '').toLowerCase()
+  const content = title + ' ' + selftext
+  
+  if (content.includes('cloudfuze')) {
+    return true
+  }
+  
+  return false
+}
+
 // Calculate relevance score based on keyword matches
 function calculateRelevanceScore(thread, query) {
   const searchTerms = query.toLowerCase().split(/\s+/).filter(term => term.length > 2)
@@ -115,8 +139,12 @@ export async function searchReddit({
     
     console.log(`Raw results: ${allThreads.length} threads`)
     
+    // FILTER: Exclude archived, locked, and CloudFuze-mentioned threads
+    let activeThreads = allThreads.filter(thread => !shouldExcludeThread(thread))
+    console.log(`After excluding archived/locked/CloudFuze: ${activeThreads.length} threads`)
+    
     // FILTER: Only keep threads that are actually relevant to the query
-    let relevantThreads = allThreads.filter(thread => isRelevantToQuery(thread, query))
+    let relevantThreads = activeThreads.filter(thread => isRelevantToQuery(thread, query))
     
     console.log(`After relevance filter: ${relevantThreads.length} threads`)
     
@@ -200,6 +228,8 @@ async function fetchRedditSearch(query, subreddit, timeFilter, sort, limit) {
         is_self: post.is_self,
         thumbnail: post.thumbnail,
         link_flair_text: post.link_flair_text,
+        archived: post.archived,
+        locked: post.locked,
         ai_visibility_score: post.score + (post.num_comments * 5)
       }
     })

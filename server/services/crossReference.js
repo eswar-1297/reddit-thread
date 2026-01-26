@@ -40,6 +40,30 @@ function isRelevantToQuery(thread, query) {
   return passes
 }
 
+// Check if thread should be excluded (archived, locked, or mentions CloudFuze)
+function shouldExcludeThread(thread) {
+  // Filter out archived threads (can't comment on them)
+  if (thread.archived) {
+    return true
+  }
+  
+  // Filter out locked threads (can't comment on them)
+  if (thread.locked) {
+    return true
+  }
+  
+  // Filter out threads that mention CloudFuze (already have content)
+  const title = (thread.title || '').toLowerCase()
+  const selftext = (thread.selftext || '').toLowerCase()
+  const content = title + ' ' + selftext
+  
+  if (content.includes('cloudfuze')) {
+    return true
+  }
+  
+  return false
+}
+
 // Calculate relevance score
 function calculateRelevanceScore(thread, query) {
   if (!thread.title) return 0
@@ -103,6 +127,8 @@ async function searchRedditDirect(query, sort = 'relevance', limit = 100) {
         created_utc: post.created_utc,
         url: `https://reddit.com${post.permalink}`,
         permalink: post.permalink,
+        archived: post.archived,
+        locked: post.locked,
         source: 'reddit',
         ai_sources: ['reddit']
       }
@@ -140,7 +166,9 @@ async function fetchRedditThreadDetails(threadId) {
       num_comments: post.num_comments,
       created_utc: post.created_utc,
       url: `https://reddit.com${post.permalink}`,
-      permalink: post.permalink
+      permalink: post.permalink,
+      archived: post.archived,
+      locked: post.locked
     }
   } catch (error) {
     return null
@@ -258,9 +286,14 @@ export async function crossReferenceSearch(query, options = {}) {
   
   console.log(`📥 Enriched ${enrichedCount} AI threads with Reddit data`)
   
+  // FILTER: Exclude archived, locked, and CloudFuze-mentioned threads
+  const beforeExclude = enrichedThreads.length
+  const activeThreads = enrichedThreads.filter(thread => !shouldExcludeThread(thread))
+  console.log(`📊 After excluding archived/locked/CloudFuze: ${activeThreads.length} (removed ${beforeExclude - activeThreads.length})`)
+  
   // THEN: Filter for relevance (now all threads have titles)
-  const beforeFilter = enrichedThreads.length
-  const filteredByRelevance = enrichedThreads.filter(thread => isRelevantToQuery(thread, query))
+  const beforeFilter = activeThreads.length
+  const filteredByRelevance = activeThreads.filter(thread => isRelevantToQuery(thread, query))
   console.log(`📊 After relevance filter: ${filteredByRelevance.length} (removed ${beforeFilter - filteredByRelevance.length} irrelevant)`)
   
   // Add source flags and calculate scores
