@@ -1,4 +1,4 @@
-import { Filter, ArrowUpCircle, MessageCircle } from 'lucide-react'
+import { Filter, ArrowUpCircle, MessageCircle, Calendar } from 'lucide-react'
 
 const MIN_SCORE_OPTIONS = [
   { value: 0, label: 'Any' },
@@ -16,6 +16,15 @@ const MIN_COMMENTS_OPTIONS = [
   { value: 25, label: '25+' },
   { value: 50, label: '50+' },
   { value: 100, label: '100+' }
+]
+
+const TIME_FILTER_OPTIONS = [
+  { value: 'all', label: 'All Time' },
+  { value: '1month', label: 'Last Month' },
+  { value: '3months', label: 'Last 3 Months' },
+  { value: '6months', label: 'Last 6 Months' },
+  { value: '1year', label: 'Last Year' },
+  { value: 'older', label: 'More than a Year' }
 ]
 
 function FilterPanel({ filters, setFilters, darkMode }) {
@@ -46,7 +55,26 @@ function FilterPanel({ filters, setFilters, darkMode }) {
         </h3>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {/* Time Filter */}
+        <div>
+          <label className={labelClasses}>
+            <Calendar size={14} />
+            Time Period
+          </label>
+          <select
+            value={filters.timeFilter || 'all'}
+            onChange={(e) => handleChange('timeFilter', e.target.value)}
+            className={inputClasses}
+          >
+            {TIME_FILTER_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Min Score */}
         <div>
           <label className={labelClasses}>

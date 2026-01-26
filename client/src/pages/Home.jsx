@@ -1,8 +1,36 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { AlertCircle, Brain, Loader2, MessageSquare } from 'lucide-react'
 import SearchBar from '../components/SearchBar'
 import ThreadCard from '../components/ThreadCard'
+import FilterPanel from '../components/FilterPanel'
 import { searchAIThreads, addBookmark, getBookmarks } from '../services/api'
+
+// Helper function to filter threads by time
+function filterByTime(threads, timeFilter) {
+  if (!timeFilter || timeFilter === 'all') return threads
+  
+  const now = Date.now() / 1000 // Current time in seconds
+  const DAY = 86400 // seconds in a day
+  
+  return threads.filter(thread => {
+    const threadAge = now - thread.created_utc
+    
+    switch (timeFilter) {
+      case '1month':
+        return threadAge <= 30 * DAY
+      case '3months':
+        return threadAge <= 90 * DAY
+      case '6months':
+        return threadAge <= 180 * DAY
+      case '1year':
+        return threadAge <= 365 * DAY
+      case 'older':
+        return threadAge > 365 * DAY
+      default:
+        return true
+    }
+  })
+}
 
 function Home({ darkMode }) {
   const [results, setResults] = useState([])
@@ -11,6 +39,31 @@ function Home({ darkMode }) {
   const [error, setError] = useState(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [bookmarkedIds, setBookmarkedIds] = useState(new Set())
+  const [filters, setFilters] = useState({
+    timeFilter: 'all',
+    minScore: 0,
+    minComments: 0
+  })
+  
+  // Apply filters to results
+  const filteredResults = useMemo(() => {
+    let filtered = results
+    
+    // Apply time filter
+    filtered = filterByTime(filtered, filters.timeFilter)
+    
+    // Apply score filter
+    if (filters.minScore > 0) {
+      filtered = filtered.filter(t => t.score >= filters.minScore)
+    }
+    
+    // Apply comments filter
+    if (filters.minComments > 0) {
+      filtered = filtered.filter(t => t.num_comments >= filters.minComments)
+    }
+    
+    return filtered
+  }, [results, filters])
 
   // Load existing bookmarks
   useEffect(() => {
@@ -87,6 +140,17 @@ function Home({ darkMode }) {
         />
       </div>
 
+      {/* Filter Panel */}
+      {hasSearched && results.length > 0 && (
+        <div className="animate-fade-in">
+          <FilterPanel 
+            filters={filters} 
+            setFilters={setFilters} 
+            darkMode={darkMode} 
+          />
+        </div>
+      )}
+
       {/* Stats */}
       {stats && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-in">
@@ -139,15 +203,20 @@ function Home({ darkMode }) {
             <div className="flex items-center gap-2">
               <MessageSquare size={18} className="text-reddit-orange" />
               <h2 className={`font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                {results.length} {results.length === 1 ? 'thread' : 'threads'} found
+                {filteredResults.length} {filteredResults.length === 1 ? 'thread' : 'threads'} found
+                {filteredResults.length !== results.length && (
+                  <span className={`text-sm font-normal ml-2 ${darkMode ? 'text-gray-500' : 'text-gray-400'}`}>
+                    (filtered from {results.length})
+                  </span>
+                )}
               </h2>
             </div>
           </div>
 
           {/* Results grid */}
-          {results.length > 0 ? (
+          {filteredResults.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {results.map((thread, index) => (
+              {filteredResults.map((thread, index) => (
                 <ThreadCard
                   key={thread.id}
                   thread={thread}
@@ -166,7 +235,9 @@ function Home({ darkMode }) {
                 : 'bg-gray-50 border-gray-200'
             }`}>
               <p className={darkMode ? 'text-gray-400' : 'text-gray-500'}>
-                No threads found. Try a different search term.
+                {results.length > 0 
+                  ? 'No threads match your filters. Try adjusting the filters.'
+                  : 'No threads found. Try a different search term.'}
               </p>
             </div>
           )}
