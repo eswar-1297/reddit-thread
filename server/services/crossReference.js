@@ -210,16 +210,17 @@ export async function crossReferenceSearch(query, options = {}) {
     includeOpenAI = true,
     minScore = 0,
     minComments = 0,
-    limit = 50
+    limit = 150
   } = options
   
   // Collect threads from all sources
   const allPromises = []
   
-  // Reddit searches (relevance + top)
+  // Reddit searches (relevance + top + new)
   console.log('📌 Starting Reddit searches...')
   allPromises.push(searchRedditDirect(query, 'relevance', 100))
   allPromises.push(searchRedditDirect(query, 'top', 100))
+  allPromises.push(searchRedditDirect(query, 'new', 100))
   
   // AI searches
   if (includeGemini) {

@@ -104,7 +104,7 @@ export async function searchReddit({
   subreddit, 
   timeFilter = 'all', 
   sort = 'relevance', 
-  limit = 100,
+  limit = 200,
   minScore = 0,
   minComments = 0,
   aiOptimized = false 

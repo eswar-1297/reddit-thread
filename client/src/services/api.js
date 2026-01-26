@@ -6,7 +6,7 @@ export async function searchThreads({
   subreddit, 
   timeFilter, 
   sort, 
-  limit = 100,
+  limit = 200,
   minScore = 0,
   minComments = 0,
   aiOptimized = false 
@@ -37,7 +37,7 @@ export async function searchAIThreads({
   query,
   minScore = 0,
   minComments = 0,
-  limit = 50,
+  limit = 150,
   useGemini = true,
   useOpenAI = true,
   useBrave = true

@@ -19,7 +19,7 @@ router.get('/', async (req, res, next) => {
       subreddit: subreddit?.trim(),
       timeFilter: time || 'all',
       sort: sort || 'relevance',
-      limit: parseInt(limit) || 100,
+      limit: parseInt(limit) || 200,
       minScore: parseInt(minScore) || 0,
       minComments: parseInt(minComments) || 0,
       aiOptimized: aiOptimized === 'true'
@@ -49,7 +49,7 @@ router.get('/ai', async (req, res, next) => {
       includeBrave: brave !== 'false',
       minScore: parseInt(minScore) || 0,
       minComments: parseInt(minComments) || 0,
-      limit: parseInt(limit) || 50
+      limit: parseInt(limit) || 150
     })
 
     res.json(results)
