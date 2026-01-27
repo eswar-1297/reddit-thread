@@ -32,7 +32,7 @@ export async function searchThreads({
   return response.json()
 }
 
-// AI Cross-Reference search (Gemini + OpenAI + Brave)
+// AI Cross-Reference search (Gemini + OpenAI + Google)
 export async function searchAIThreads({
   query,
   minScore = 0,
@@ -40,7 +40,7 @@ export async function searchAIThreads({
   limit = 150,
   useGemini = true,
   useOpenAI = true,
-  useBrave = true
+  useGoogle = true
 }) {
   const params = new URLSearchParams({
     q: query,
@@ -49,7 +49,7 @@ export async function searchAIThreads({
     limit: limit.toString(),
     gemini: useGemini.toString(),
     openai: useOpenAI.toString(),
-    brave: useBrave.toString()
+    google: useGoogle.toString()
   })
 
   const response = await fetch(`${API_BASE}/search/ai?${params}`)
@@ -65,15 +65,17 @@ export async function searchAIThreads({
 // Quora search using Search APIs (Bing + Google CSE)
 export async function searchQuoraQuestions({
   query,
-  limit = 50,
+  limit = 150,
   useBing = true,
-  useGoogle = true
+  useGoogle = true,
+  timeFilter = 'all'
 }) {
   const params = new URLSearchParams({
     q: query,
     limit: limit.toString(),
     bing: useBing.toString(),
-    google: useGoogle.toString()
+    google: useGoogle.toString(),
+    time: timeFilter
   })
 
   const response = await fetch(`${API_BASE}/search/quora?${params}`)

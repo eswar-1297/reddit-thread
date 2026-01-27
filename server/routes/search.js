@@ -31,10 +31,10 @@ router.get('/', async (req, res, next) => {
   }
 })
 
-// Cross-reference AI search (Gemini + OpenAI + Brave)
+// Cross-reference AI search (Gemini + OpenAI + Google)
 router.get('/ai', async (req, res, next) => {
   try {
-    const { q, minScore, minComments, limit, gemini, openai, brave } = req.query
+    const { q, minScore, minComments, limit, gemini, openai, google } = req.query
 
     if (!q || !q.trim()) {
       return res.status(400).json({ message: 'Search query is required' })
@@ -46,7 +46,7 @@ router.get('/ai', async (req, res, next) => {
     const results = await crossReferenceSearch(q.trim(), {
       includeGemini: gemini !== 'false',
       includeOpenAI: openai !== 'false',
-      includeBrave: brave !== 'false',
+      includeGoogle: google !== 'false',
       minScore: parseInt(minScore) || 0,
       minComments: parseInt(minComments) || 0,
       limit: parseInt(limit) || 150
@@ -62,7 +62,7 @@ router.get('/ai', async (req, res, next) => {
 // Quora search using Search APIs (Bing + Google CSE)
 router.get('/quora', async (req, res, next) => {
   try {
-    const { q, limit, bing, google, cache } = req.query
+    const { q, limit, bing, google, cache, time } = req.query
 
     if (!q || !q.trim()) {
       return res.status(400).json({ message: 'Search query is required' })
@@ -70,12 +70,14 @@ router.get('/quora', async (req, res, next) => {
 
     console.log('\n🔍 Quora Search API Request')
     console.log('Query:', q)
+    console.log('Time Filter:', time || 'all')
 
     const results = await crossReferenceQuoraSearch(q.trim(), {
       useBing: bing !== 'false',
       useGoogle: google !== 'false',
       useCache: cache !== 'false',
-      limit: parseInt(limit) || 50
+      limit: parseInt(limit) || 150,
+      timeFilter: time || 'all'
     })
 
     res.json(results)

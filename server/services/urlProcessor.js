@@ -203,17 +203,109 @@ export function deduplicateResults(results) {
 }
 
 /**
+ * Check if a Quora question should be excluded (mentions CloudFuze)
+ * @param {Object} question - Question object with title and snippet
+ * @returns {boolean} True if should be excluded
+ */
+function shouldExcludeQuestion(question) {
+  const title = (question.title || '').toLowerCase()
+  const snippet = (question.snippet || '').toLowerCase()
+  const content = title + ' ' + snippet
+  
+  // Filter out questions that mention CloudFuze (already have content)
+  if (content.includes('cloudfuze')) {
+    return true
+  }
+  
+  return false
+}
+
+/**
+ * Check if a Quora question is relevant to the search query
+ * @param {Object} question - Question object with title and snippet
+ * @param {string} query - Original search query
+ * @returns {boolean} True if relevant
+ */
+function isRelevantQuestion(question, query) {
+  if (!question.title || !query) return true // Be lenient if no title/query
+  
+  const title = question.title.toLowerCase()
+  const snippet = (question.snippet || '').toLowerCase()
+  const content = title + ' ' + snippet
+  
+  // Stop words to ignore
+  const stopWords = ['the', 'and', 'for', 'from', 'with', 'how', 'what', 'why', 'can', 'you', 'your', 'are', 'was', 'were', 'has', 'have', 'had', 'been', 'is', 'it', 'to', 'of', 'in', 'that', 'this', 'do', 'does', 'best', 'way', 'ways']
+  
+  // Get meaningful search terms
+  const searchTerms = query.toLowerCase()
+    .split(/\s+/)
+    .filter(term => term.length > 2)
+    .filter(term => !stopWords.includes(term))
+  
+  if (searchTerms.length === 0) return true // No meaningful terms, accept all
+  
+  // Count matches
+  const matchedTerms = searchTerms.filter(term => content.includes(term))
+  
+  // Require at least 1 meaningful term to match (lenient for Quora since results are harder to get)
+  return matchedTerms.length >= 1
+}
+
+/**
+ * Calculate relevance score for sorting
+ * @param {Object} question - Question object
+ * @param {string} query - Search query
+ * @returns {number} Relevance score (higher = more relevant)
+ */
+function calculateRelevanceScore(question, query) {
+  if (!question.title || !query) return 0
+  
+  const title = question.title.toLowerCase()
+  const snippet = (question.snippet || '').toLowerCase()
+  const queryLower = query.toLowerCase()
+  
+  let score = 0
+  
+  // Exact query match in title = highest score
+  if (title.includes(queryLower)) {
+    score += 100
+  }
+  
+  // Count word matches in title (more valuable than snippet)
+  const searchTerms = queryLower.split(/\s+/).filter(t => t.length > 2)
+  searchTerms.forEach(term => {
+    if (title.includes(term)) score += 20
+    if (snippet.includes(term)) score += 5
+  })
+  
+  // Multi-source bonus (found in both Bing + Google = more AI visible)
+  score += (question.sources?.length || 1) * 15
+  
+  // Question format bonus (actual questions are better for AI visibility)
+  if (title.includes('?') || title.toLowerCase().startsWith('how') || 
+      title.toLowerCase().startsWith('what') || title.toLowerCase().startsWith('why') ||
+      title.toLowerCase().startsWith('can') || title.toLowerCase().startsWith('should')) {
+    score += 10
+  }
+  
+  return score
+}
+
+/**
  * Process raw search results through the full pipeline
  * 1. Normalize URLs
  * 2. Validate as Quora questions
  * 3. Deduplicate across sources
- * 4. Add metadata
+ * 4. Filter out CloudFuze mentions
+ * 5. Filter out irrelevant questions
+ * 6. Sort by AI visibility score
  * 
  * @param {Object[]} bingResults - Results from Bing
  * @param {Object[]} googleResults - Results from Google CSE
+ * @param {string} originalQuery - Original search query for relevance filtering
  * @returns {Object} Processed results with stats
  */
-export function processSearchResults(bingResults = [], googleResults = []) {
+export function processSearchResults(bingResults = [], googleResults = [], originalQuery = '') {
   console.log('\n📊 Processing search results...')
   console.log(`   Raw Bing results: ${bingResults.length}`)
   console.log(`   Raw Google results: ${googleResults.length}`)
@@ -222,7 +314,35 @@ export function processSearchResults(bingResults = [], googleResults = []) {
   const allResults = [...bingResults, ...googleResults]
   
   // Deduplicate and validate
-  const processed = deduplicateResults(allResults)
+  let processed = deduplicateResults(allResults)
+  console.log(`   After deduplication: ${processed.length} unique questions`)
+  
+  // Filter out CloudFuze mentions
+  const beforeCloudFuze = processed.length
+  processed = processed.filter(q => !shouldExcludeQuestion(q))
+  const cloudFuzeFiltered = beforeCloudFuze - processed.length
+  if (cloudFuzeFiltered > 0) {
+    console.log(`   Filtered out ${cloudFuzeFiltered} CloudFuze mentions`)
+  }
+  
+  // Filter out irrelevant questions
+  if (originalQuery) {
+    const beforeRelevance = processed.length
+    processed = processed.filter(q => isRelevantQuestion(q, originalQuery))
+    const irrelevantFiltered = beforeRelevance - processed.length
+    if (irrelevantFiltered > 0) {
+      console.log(`   Filtered out ${irrelevantFiltered} irrelevant questions`)
+    }
+  }
+  
+  // Calculate relevance scores and sort by AI visibility
+  processed = processed.map(q => ({
+    ...q,
+    relevanceScore: calculateRelevanceScore(q, originalQuery)
+  }))
+  
+  // Sort by relevance score (highest first) - prioritizes AI-visible questions
+  processed.sort((a, b) => b.relevanceScore - a.relevanceScore)
   
   // Calculate stats
   const stats = {
@@ -237,17 +357,10 @@ export function processSearchResults(bingResults = [], googleResults = []) {
   console.log(`   From Google: ${stats.google}`)
   console.log(`   Multi-source: ${stats.multiSource}`)
   
-  // Sort by source count (multi-source first) then alphabetically
-  processed.sort((a, b) => {
-    if (b.sources.length !== a.sources.length) {
-      return b.sources.length - a.sources.length
-    }
-    return a.title.localeCompare(b.title)
-  })
-  
   return {
     questions: processed,
     stats
   }
 }
+
 

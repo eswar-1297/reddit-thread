@@ -60,11 +60,33 @@ export async function crossReferenceQuoraSearch(query, options = {}) {
   const {
     useBing = configuredAPIs.bing,  // Auto-detect
     useGoogle = configuredAPIs.google,  // Auto-detect
-    maxVariants = 6,
-    resultsPerQuery = 20,
-    limit = 50,
-    useCache = true
+    maxVariants = 8,
+    resultsPerQuery = 30,
+    limit = 150,
+    useCache = true,
+    timeFilter = 'all'  // Time filter: all, 1month, 3months, 6months, 1year, older
   } = options
+  
+  // Convert timeFilter to API-specific formats
+  const getTimeParams = (filter) => {
+    switch (filter) {
+      case '1month':
+        return { bingFreshness: 'Month', googleDateRestrict: 'm1' }
+      case '3months':
+        return { bingFreshness: 'Month', googleDateRestrict: 'm3' }  // Bing doesn't have 3 month, use Month
+      case '6months':
+        return { bingFreshness: null, googleDateRestrict: 'm6' }  // Use date range for Bing
+      case '1year':
+        return { bingFreshness: null, googleDateRestrict: 'y1' }
+      case 'older':
+        // For "older than a year", we can't easily filter - return null
+        return { bingFreshness: null, googleDateRestrict: null }
+      default:
+        return { bingFreshness: null, googleDateRestrict: null }
+    }
+  }
+  
+  const timeParams = getTimeParams(timeFilter)
   
   // Use cache wrapper
   const searchFn = async () => {
@@ -84,7 +106,7 @@ export async function crossReferenceQuoraSearch(query, options = {}) {
     
     if (useBing) {
       searchPromises.push(
-        searchBingMultiQuery(searchQueries, resultsPerQuery)
+        searchBingMultiQuery(searchQueries, resultsPerQuery, { freshness: timeParams.bingFreshness })
           .catch(err => {
             console.error('Bing search failed:', err.message)
             return { results: [], source: 'bing' }
@@ -94,7 +116,7 @@ export async function crossReferenceQuoraSearch(query, options = {}) {
     
     if (useGoogle) {
       searchPromises.push(
-        searchGoogleCSEMultiQuery(searchQueries, Math.min(resultsPerQuery, 10))
+        searchGoogleCSEMultiQuery(searchQueries, Math.min(resultsPerQuery, 10), { dateRestrict: timeParams.googleDateRestrict })
           .catch(err => {
             console.error('Google CSE search failed:', err.message)
             return { results: [], source: 'google' }
@@ -108,9 +130,9 @@ export async function crossReferenceQuoraSearch(query, options = {}) {
     const bingResults = searchResults.find(r => r.source === 'bing')?.results || []
     const googleResults = searchResults.find(r => r.source === 'google')?.results || []
     
-    // Step 5: Process, normalize, deduplicate, validate
+    // Step 5: Process, normalize, deduplicate, validate, filter
     console.log('\n🔧 Step 5: Processing Results')
-    const { questions, stats } = processSearchResults(bingResults, googleResults)
+    const { questions, stats } = processSearchResults(bingResults, googleResults, query)
     
     // Step 6: Limit results
     const limitedQuestions = questions.slice(0, limit)

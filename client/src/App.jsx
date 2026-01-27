@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import Home from './pages/Home'
+import Quora from './pages/Quora'
 import Bookmarks from './pages/Bookmarks'
 import Navbar from './components/Navbar'
 
@@ -26,6 +27,7 @@ function App() {
         <main className="container mx-auto px-4 py-6">
           <Routes>
             <Route path="/" element={<Home darkMode={darkMode} />} />
+            <Route path="/quora" element={<Quora darkMode={darkMode} />} />
             <Route path="/bookmarks" element={<Bookmarks darkMode={darkMode} />} />
           </Routes>
         </main>
@@ -35,4 +37,5 @@ function App() {
 }
 
 export default App
+
 

@@ -21,10 +21,11 @@ export async function searchGoogleCSE(query, options = {}) {
   const {
     num = 10,           // Results per page (max 10 for Google CSE)
     start = 1,          // Start index (1-based)
-    safe = 'active'     // Safe search level
+    safe = 'active',    // Safe search level
+    dateRestrict = null // Time filter: d[number], w[number], m[number], y[number]
   } = options
   
-  console.log(`🟢 Google: Searching "${query.substring(0, 60)}..."`)
+  console.log(`🟢 Google: Searching "${query.substring(0, 60)}..."${dateRestrict ? ` (dateRestrict: ${dateRestrict})` : ''}`)
   
   try {
     const params = new URLSearchParams({
@@ -35,6 +36,11 @@ export async function searchGoogleCSE(query, options = {}) {
       start: start.toString(),
       safe
     })
+    
+    // Add date restriction if specified
+    if (dateRestrict) {
+      params.append('dateRestrict', dateRestrict)
+    }
     
     const response = await fetch(`${GOOGLE_CSE_API_URL}?${params}`)
     
@@ -123,16 +129,19 @@ export async function searchGoogleCSEWithPagination(query, maxResults = 50) {
  * Search Google CSE with multiple query variants
  * @param {string[]} queries - Array of search queries
  * @param {number} resultsPerQuery - Max results per query
+ * @param {Object} options - Additional options (dateRestrict, etc.)
  * @returns {Promise<Object>} Combined results from all queries
  */
-export async function searchGoogleCSEMultiQuery(queries, resultsPerQuery = 10) {
+export async function searchGoogleCSEMultiQuery(queries, resultsPerQuery = 10, options = {}) {
+  const { dateRestrict = null } = options
+  
   console.log(`\n🟢 ========== GOOGLE CSE MULTI-QUERY SEARCH ==========`)
-  console.log(`🟢 Running ${queries.length} queries...`)
+  console.log(`🟢 Running ${queries.length} queries...${dateRestrict ? ` (dateRestrict: ${dateRestrict})` : ''}`)
   
   const allResults = []
   
   for (const query of queries) {
-    const { results, error } = await searchGoogleCSE(query, { num: resultsPerQuery })
+    const { results, error } = await searchGoogleCSE(query, { num: resultsPerQuery, dateRestrict })
     
     if (!error) {
       allResults.push(...results)
@@ -151,4 +160,5 @@ export async function searchGoogleCSEMultiQuery(queries, resultsPerQuery = 10) {
     queriesExecuted: queries.length
   }
 }
+
 

@@ -89,10 +89,10 @@ function Home({ darkMode }) {
         query,
         minScore: 0,
         minComments: 0,
-        limit: 50,
+        limit: 150,
         useGemini: true,
         useOpenAI: true,
-        useBrave: false
+        useGoogle: true
       })
       
       setResults(data.threads || [])
@@ -126,8 +126,9 @@ function Home({ darkMode }) {
         </div>
         <p className={`text-lg max-w-2xl mx-auto ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
           Find Reddit threads indexed by <span className="text-reddit-orange font-semibold">Reddit</span>,{' '}
-          <span className="text-blue-500 font-semibold">Gemini</span>, and{' '}
-          <span className="text-green-500 font-semibold">ChatGPT</span> for maximum AI visibility
+          <span className="text-blue-500 font-semibold">Gemini</span>,{' '}
+          <span className="text-green-500 font-semibold">ChatGPT</span>, and{' '}
+          <span className="text-yellow-500 font-semibold">Google</span> for maximum AI visibility
         </p>
       </div>
 
@@ -153,7 +154,7 @@ function Home({ darkMode }) {
 
       {/* Stats */}
       {stats && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 animate-fade-in">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 animate-fade-in">
           <div className={`rounded-xl p-4 text-center ${
             darkMode ? 'bg-reddit-gray/50' : 'bg-white border border-gray-200'
           }`}>
@@ -179,6 +180,12 @@ function Home({ darkMode }) {
           }`}>
             <p className="text-2xl font-bold text-green-500">{stats.openai}</p>
             <p className={`text-xs ${darkMode ? 'text-green-400' : 'text-green-600'}`}>ChatGPT</p>
+          </div>
+          <div className={`rounded-xl p-4 text-center ${
+            darkMode ? 'bg-yellow-500/10' : 'bg-yellow-50'
+          }`}>
+            <p className="text-2xl font-bold text-yellow-500">{stats.google || 0}</p>
+            <p className={`text-xs ${darkMode ? 'text-yellow-400' : 'text-yellow-600'}`}>Google</p>
           </div>
         </div>
       )}
@@ -256,7 +263,7 @@ function Home({ darkMode }) {
             Ready to find AI-visible threads
           </h3>
           <p className={`max-w-md mx-auto ${darkMode ? 'text-gray-500' : 'text-gray-500'}`}>
-            Search across Reddit, Gemini, and ChatGPT to find threads with maximum visibility.
+            Search across Reddit, Gemini, ChatGPT, and Google to find threads with maximum AI visibility.
           </p>
         </div>
       )}
@@ -269,7 +276,7 @@ function Home({ darkMode }) {
             Searching Reddit across all sources...
           </h3>
           <p className={darkMode ? 'text-gray-500' : 'text-gray-500'}>
-            Reddit + Gemini + ChatGPT
+            Reddit + Gemini + ChatGPT + Google
           </p>
         </div>
       )}

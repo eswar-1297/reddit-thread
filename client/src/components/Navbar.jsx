@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Search, Bookmark, Sun, Moon } from 'lucide-react'
+import { Search, Bookmark, Sun, Moon, HelpCircle } from 'lucide-react'
 
 function Navbar({ darkMode, setDarkMode }) {
   const location = useLocation()
@@ -43,7 +43,21 @@ function Navbar({ darkMode, setDarkMode }) {
               }`}
             >
               <Search size={18} />
-              <span className="hidden sm:inline">Search</span>
+              <span className="hidden sm:inline">Reddit</span>
+            </Link>
+            
+            <Link
+              to="/quora"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                isActive('/quora')
+                  ? 'bg-red-500 text-white'
+                  : darkMode
+                    ? 'text-gray-300 hover:bg-reddit-gray hover:text-white'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <HelpCircle size={18} />
+              <span className="hidden sm:inline">Quora</span>
             </Link>
             
             <Link
@@ -80,4 +94,5 @@ function Navbar({ darkMode, setDarkMode }) {
 }
 
 export default Navbar
+
 

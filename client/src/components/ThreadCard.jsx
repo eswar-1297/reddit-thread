@@ -134,6 +134,12 @@ function ThreadCard({ thread, onBookmark, isBookmarked, darkMode, index, showAiS
               ChatGPT
             </span>
           )}
+          {thread.found_in_google && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-500/20 text-yellow-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+              Google
+            </span>
+          )}
         </div>
       )}
 

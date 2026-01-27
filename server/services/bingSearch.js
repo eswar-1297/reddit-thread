@@ -21,10 +21,11 @@ export async function searchBing(query, options = {}) {
     count = 50,          // Results per page (max 50)
     offset = 0,          // Pagination offset
     market = 'en-US',    // Market/locale
-    safeSearch = 'Moderate'
+    safeSearch = 'Moderate',
+    freshness = null     // Time filter: Day, Week, Month, or date range (YYYY-MM-DD..YYYY-MM-DD)
   } = options
   
-  console.log(`🔵 Bing: Searching "${query.substring(0, 60)}..."`)
+  console.log(`🔵 Bing: Searching "${query.substring(0, 60)}..."${freshness ? ` (freshness: ${freshness})` : ''}`)
   
   try {
     const params = new URLSearchParams({
@@ -34,6 +35,11 @@ export async function searchBing(query, options = {}) {
       mkt: market,
       safeSearch
     })
+    
+    // Add freshness filter if specified
+    if (freshness) {
+      params.append('freshness', freshness)
+    }
     
     const response = await fetch(`${BING_API_URL}?${params}`, {
       headers: {
@@ -120,22 +126,25 @@ export async function searchBingWithPagination(query, maxResults = 100) {
  * Search Bing with multiple query variants
  * @param {string[]} queries - Array of search queries
  * @param {number} resultsPerQuery - Max results per query
+ * @param {Object} options - Additional options (freshness, etc.)
  * @returns {Promise<Object>} Combined results from all queries
  */
-export async function searchBingMultiQuery(queries, resultsPerQuery = 20) {
+export async function searchBingMultiQuery(queries, resultsPerQuery = 20, options = {}) {
   // Skip early if no API key
   if (!process.env.BING_API_KEY) {
     console.log('🔵 Bing: Skipping (no API key configured)')
     return { results: [], source: 'bing', queriesExecuted: 0 }
   }
   
+  const { freshness = null } = options
+  
   console.log(`\n🔵 ========== BING MULTI-QUERY SEARCH ==========`)
-  console.log(`🔵 Running ${queries.length} queries...`)
+  console.log(`🔵 Running ${queries.length} queries...${freshness ? ` (freshness: ${freshness})` : ''}`)
   
   const allResults = []
   
   for (const query of queries) {
-    const { results } = await searchBing(query, { count: resultsPerQuery })
+    const { results } = await searchBing(query, { count: resultsPerQuery, freshness })
     allResults.push(...results)
     
     // Small delay between queries

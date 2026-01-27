@@ -1,10 +1,67 @@
 // Cross-Reference Engine
-// Combines results from Reddit + Gemini + ChatGPT with RELEVANCE FILTERING
+// Combines results from Reddit + Gemini + ChatGPT + Google with RELEVANCE FILTERING
 
 import { searchWithGemini } from './gemini.js'
 import { searchWithOpenAI } from './openai.js'
+import { searchGoogleCSE } from './googleCSE.js'
 
 const REDDIT_USER_AGENT = 'RedditThreadFinder/1.0.0'
+
+// Check if Google CSE is configured
+function isGoogleConfigured() {
+  return !!process.env.GOOGLE_CSE_API_KEY && !!process.env.GOOGLE_CSE_ID
+}
+
+// Search Google for Reddit threads
+async function searchGoogleForReddit(query, limit = 10) {
+  if (!isGoogleConfigured()) {
+    console.log('🔍 Google CSE: Not configured, skipping...')
+    return []
+  }
+  
+  console.log('🔍 Google CSE: Searching for Reddit threads...')
+  
+  try {
+    // Search Google with site:reddit.com
+    const searchQuery = `site:reddit.com ${query}`
+    const { results, error } = await searchGoogleCSE(searchQuery, { num: limit })
+    
+    if (error) {
+      console.error('Google CSE error:', error)
+      return []
+    }
+    
+    // Extract Reddit thread IDs from URLs
+    const threads = []
+    
+    for (const result of results) {
+      // Match Reddit thread URLs like /r/subreddit/comments/abc123/title
+      const match = result.url.match(/reddit\.com\/r\/([^\/]+)\/comments\/([a-z0-9]+)/i)
+      
+      if (match) {
+        const subreddit = match[1]
+        const threadId = match[2]
+        
+        threads.push({
+          id: threadId,
+          url: result.url,
+          title: result.title,
+          snippet: result.snippet,
+          subreddit: subreddit,
+          source: 'google',
+          ai_sources: ['google']
+        })
+      }
+    }
+    
+    console.log(`🔍 Google CSE: Found ${threads.length} Reddit threads`)
+    return threads
+    
+  } catch (error) {
+    console.error('Google search for Reddit error:', error.message)
+    return []
+  }
+}
 
 // Check if thread is relevant to the search query
 function isRelevantToQuery(thread, query) {
@@ -182,14 +239,15 @@ function calculateAIVisibilityScore(thread, query) {
   // Relevance score (most important)
   score += calculateRelevanceScore(thread, query)
   
-  // Source points
-  const sourcePoints = { reddit: 20, gemini: 30, openai: 30 }
+  // Source points - Google added
+  const sourcePoints = { reddit: 20, gemini: 30, openai: 30, google: 25 }
   thread.ai_sources.forEach(source => {
     score += sourcePoints[source] || 10
   })
   
-  // Multi-source bonus
-  if (thread.ai_sources.length >= 3) score += 50
+  // Multi-source bonus (now with 4 sources possible)
+  if (thread.ai_sources.length >= 4) score += 75
+  else if (thread.ai_sources.length >= 3) score += 50
   else if (thread.ai_sources.length >= 2) score += 25
   
   // Engagement bonus (capped)
@@ -208,6 +266,7 @@ export async function crossReferenceSearch(query, options = {}) {
   const { 
     includeGemini = true, 
     includeOpenAI = true,
+    includeGoogle = true,
     minScore = 0,
     minComments = 0,
     limit = 150
@@ -231,6 +290,12 @@ export async function crossReferenceSearch(query, options = {}) {
   if (includeOpenAI) {
     console.log('🟢 Starting OpenAI search...')
     allPromises.push(searchWithOpenAI(query))
+  }
+  
+  // Google search for Reddit threads
+  if (includeGoogle && isGoogleConfigured()) {
+    console.log('🔍 Starting Google search for Reddit threads...')
+    allPromises.push(searchGoogleForReddit(query, 10))
   }
   
   // Wait for all
@@ -303,6 +368,7 @@ export async function crossReferenceSearch(query, options = {}) {
     found_in_reddit: thread.ai_sources.includes('reddit'),
     found_in_gemini: thread.ai_sources.includes('gemini'),
     found_in_openai: thread.ai_sources.includes('openai'),
+    found_in_google: thread.ai_sources.includes('google'),
     source_count: thread.ai_sources.length,
     ai_visibility_score: calculateAIVisibilityScore(thread, query)
   }))
@@ -324,6 +390,7 @@ export async function crossReferenceSearch(query, options = {}) {
     reddit: filteredThreads.filter(t => t.found_in_reddit).length,
     gemini: filteredThreads.filter(t => t.found_in_gemini).length,
     openai: filteredThreads.filter(t => t.found_in_openai).length,
+    google: filteredThreads.filter(t => t.found_in_google).length,
     multiSource: filteredThreads.filter(t => t.source_count >= 2).length
   }
   
@@ -333,7 +400,7 @@ export async function crossReferenceSearch(query, options = {}) {
     console.log(`[${t.ai_visibility_score}] [${t.ai_sources.join('+')}] ${t.title?.substring(0, 60)}...`)
   })
   console.log('\n--- STATS ---')
-  console.log(`Total: ${stats.total} | Reddit: ${stats.reddit} | Gemini: ${stats.gemini} | OpenAI: ${stats.openai} | Multi: ${stats.multiSource}`)
+  console.log(`Total: ${stats.total} | Reddit: ${stats.reddit} | Gemini: ${stats.gemini} | OpenAI: ${stats.openai} | Google: ${stats.google} | Multi: ${stats.multiSource}`)
   
   return { threads: filteredThreads, stats, query }
 }
