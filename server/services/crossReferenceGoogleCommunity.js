@@ -129,7 +129,7 @@ export async function crossReferenceGoogleCommunitySearch(query, options = {}) {
   
   if (useGoogle) {
     searchPromises.push(
-      searchGoogleCSEMultiQuery(searchQueries, Math.min(resultsPerQuery, 10), { dateRestrict: timeParams.googleDateRestrict })
+      searchGoogleCSEMultiQuery(searchQueries, resultsPerQuery, { dateRestrict: timeParams.googleDateRestrict })
         .catch(err => {
           console.error('Google CSE search failed:', err.message)
           return { results: [], source: 'google' }
