@@ -1,5 +1,7 @@
 // URL Processor - Normalization, Validation, and Deduplication for Quora URLs
 
+import { containsBrandMention } from './commentChecker.js'
+
 /**
  * Normalize a Quora URL to a canonical format
  * - Convert to lowercase (domain only)
@@ -203,18 +205,28 @@ export function deduplicateResults(results) {
 }
 
 /**
- * Check if a Quora question should be excluded (mentions CloudFuze)
+ * Check if a Quora question should be excluded (mentions CloudFuze in title/snippet)
+ * Note: Full answer checking is done separately via batchCheckQuoraAnswers
  * @param {Object} question - Question object with title and snippet
+ * @param {Map} answerCheckResults - Pre-fetched answer check results (optional)
  * @returns {boolean} True if should be excluded
  */
-function shouldExcludeQuestion(question) {
+function shouldExcludeQuestion(question, answerCheckResults = null) {
   const title = (question.title || '').toLowerCase()
   const snippet = (question.snippet || '').toLowerCase()
   const content = title + ' ' + snippet
   
-  // Filter out questions that mention CloudFuze (already have content)
-  if (content.includes('cloudfuze')) {
+  // Filter out questions that mention CloudFuze in title/snippet
+  if (containsBrandMention(content)) {
     return true
+  }
+  
+  // Check if answers contain brand mention (if results are available)
+  if (answerCheckResults && question.url) {
+    const checkResult = answerCheckResults.get(question.url)
+    if (checkResult?.hasBrandMention) {
+      return true
+    }
   }
   
   return false

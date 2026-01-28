@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { searchReddit, getSubredditSuggestions } from '../services/reddit.js'
 import { crossReferenceSearch } from '../services/crossReference.js'
 import { crossReferenceQuoraSearch } from '../services/crossReferenceQuora.js'
+import { crossReferenceGoogleCommunitySearch } from '../services/crossReferenceGoogleCommunity.js'
 
 const router = Router()
 
@@ -83,6 +84,35 @@ router.get('/quora', async (req, res, next) => {
     res.json(results)
   } catch (error) {
     console.error('Quora search error:', error)
+    next(error)
+  }
+})
+
+// Google Community search using Search APIs (Bing + Google CSE)
+router.get('/google-community', async (req, res, next) => {
+  try {
+    const { q, limit, bing, google, time, product } = req.query
+
+    if (!q || !q.trim()) {
+      return res.status(400).json({ message: 'Search query is required' })
+    }
+
+    console.log('\n🔍 Google Community Search API Request')
+    console.log('Query:', q)
+    console.log('Time Filter:', time || 'all')
+    console.log('Product Filter:', product || 'all')
+
+    const results = await crossReferenceGoogleCommunitySearch(q.trim(), {
+      useBing: bing !== 'false',
+      useGoogle: google !== 'false',
+      limit: parseInt(limit) || 150,
+      timeFilter: time || 'all',
+      productFilter: product || 'all'
+    })
+
+    res.json(results)
+  } catch (error) {
+    console.error('Google Community search error:', error)
     next(error)
   }
 })

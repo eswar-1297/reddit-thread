@@ -7,6 +7,7 @@ import { searchBingMultiQuery } from './bingSearch.js'
 import { searchGoogleCSEMultiQuery } from './googleCSE.js'
 import { processSearchResults } from './urlProcessor.js'
 import { withCache } from './quoraSearchCache.js'
+import { batchCheckQuoraAnswers, containsBrandMention } from './commentChecker.js'
 
 /**
  * Check which search APIs are configured
@@ -134,8 +135,38 @@ export async function crossReferenceQuoraSearch(query, options = {}) {
     console.log('\n🔧 Step 5: Processing Results')
     const { questions, stats } = processSearchResults(bingResults, googleResults, query)
     
-    // Step 6: Limit results
-    const limitedQuestions = questions.slice(0, limit)
+    // Step 6: Check answers for CloudFuze mentions
+    console.log('\n🔍 Step 6: Checking Quora answers for CloudFuze mentions...')
+    let filteredQuestions = questions
+    
+    if (questions.length > 0) {
+      try {
+        // Check answers in batches (limit to first 30 questions to avoid rate limiting)
+        const urlsToCheck = questions.slice(0, 30).map(q => q.url).filter(Boolean)
+        console.log(`   Checking ${urlsToCheck.length} questions for answer mentions...`)
+        
+        const answerCheckResults = await batchCheckQuoraAnswers(urlsToCheck, 3)
+        
+        const questionsWithBrandInAnswers = Array.from(answerCheckResults.values())
+          .filter(r => r.hasBrandMention).length
+        console.log(`   Found ${questionsWithBrandInAnswers} questions with CloudFuze in answers`)
+        
+        // Filter out questions with CloudFuze in answers
+        const beforeFilter = questions.length
+        filteredQuestions = questions.filter(q => {
+          const checkResult = answerCheckResults.get(q.url)
+          // Keep if: no check result OR check failed OR no brand mention
+          return !checkResult || !checkResult.checked || !checkResult.hasBrandMention
+        })
+        console.log(`   After filtering: ${filteredQuestions.length} (removed ${beforeFilter - filteredQuestions.length})`)
+      } catch (error) {
+        console.error('   ⚠️ Error checking answers:', error.message)
+        // Continue with unfiltered results on error
+      }
+    }
+    
+    // Step 7: Limit results
+    const limitedQuestions = filteredQuestions.slice(0, limit)
     
     // Final stats
     const finalStats = {

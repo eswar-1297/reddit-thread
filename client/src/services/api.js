@@ -88,6 +88,34 @@ export async function searchQuoraQuestions({
   return response.json()
 }
 
+// Google Community search using Search APIs (Bing + Google CSE)
+export async function searchGoogleCommunityQuestions({
+  query,
+  limit = 150,
+  useBing = true,
+  useGoogle = true,
+  timeFilter = 'all',
+  productFilter = 'all'
+}) {
+  const params = new URLSearchParams({
+    q: query,
+    limit: limit.toString(),
+    bing: useBing.toString(),
+    google: useGoogle.toString(),
+    time: timeFilter,
+    product: productFilter
+  })
+
+  const response = await fetch(`${API_BASE}/search/google-community?${params}`)
+  
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.message || 'Failed to search Google Community questions')
+  }
+  
+  return response.json()
+}
+
 export async function getBookmarks() {
   const response = await fetch(`${API_BASE}/bookmarks`)
   

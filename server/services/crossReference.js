@@ -4,6 +4,7 @@
 import { searchWithGemini } from './gemini.js'
 import { searchWithOpenAI } from './openai.js'
 import { searchGoogleCSE } from './googleCSE.js'
+import { batchCheckRedditComments, containsBrandMention } from './commentChecker.js'
 
 const REDDIT_USER_AGENT = 'RedditThreadFinder/1.0.0'
 
@@ -97,8 +98,9 @@ function isRelevantToQuery(thread, query) {
   return passes
 }
 
-// Check if thread should be excluded (archived, locked, or mentions CloudFuze)
-function shouldExcludeThread(thread) {
+// Check if thread should be excluded (archived, locked, or mentions CloudFuze in post body)
+// Note: Comment checking is done separately via batchCheckRedditComments
+function shouldExcludeThread(thread, commentCheckResults = null) {
   // Filter out archived threads (can't comment on them)
   if (thread.archived) {
     return true
@@ -109,13 +111,21 @@ function shouldExcludeThread(thread) {
     return true
   }
   
-  // Filter out threads that mention CloudFuze (already have content)
+  // Filter out threads that mention CloudFuze in post body
   const title = (thread.title || '').toLowerCase()
   const selftext = (thread.selftext || '').toLowerCase()
   const content = title + ' ' + selftext
   
-  if (content.includes('cloudfuze')) {
+  if (containsBrandMention(content)) {
     return true
+  }
+  
+  // Check if comments contain brand mention (if results are available)
+  if (commentCheckResults && thread.id) {
+    const checkResult = commentCheckResults.get(thread.id)
+    if (checkResult?.hasBrandMention) {
+      return true
+    }
   }
   
   return false
@@ -352,10 +362,35 @@ export async function crossReferenceSearch(query, options = {}) {
   
   console.log(`📥 Enriched ${enrichedCount} AI threads with Reddit data`)
   
-  // FILTER: Exclude archived, locked, and CloudFuze-mentioned threads
-  const beforeExclude = enrichedThreads.length
-  const activeThreads = enrichedThreads.filter(thread => !shouldExcludeThread(thread))
-  console.log(`📊 After excluding archived/locked/CloudFuze: ${activeThreads.length} (removed ${beforeExclude - activeThreads.length})`)
+  // FILTER STEP 1: Initial filter for archived/locked and post body CloudFuze mentions
+  const beforeInitialFilter = enrichedThreads.length
+  const initialFilteredThreads = enrichedThreads.filter(thread => !shouldExcludeThread(thread, null))
+  console.log(`📊 After initial filter (archived/locked/post body): ${initialFilteredThreads.length} (removed ${beforeInitialFilter - initialFilteredThreads.length})`)
+  
+  // FILTER STEP 2: Batch check comments for CloudFuze mentions
+  console.log('🔍 Checking comments for CloudFuze mentions...')
+  const threadIds = initialFilteredThreads.map(t => t.id).filter(Boolean)
+  let commentCheckResults = new Map()
+  
+  if (threadIds.length > 0) {
+    try {
+      // Check comments in batches (limit to first 50 threads to avoid rate limiting)
+      const idsToCheck = threadIds.slice(0, 50)
+      console.log(`   Checking ${idsToCheck.length} threads for comment mentions...`)
+      commentCheckResults = await batchCheckRedditComments(idsToCheck, 5)
+      
+      const threadsWithBrandInComments = Array.from(commentCheckResults.values())
+        .filter(r => r.hasBrandMention).length
+      console.log(`   Found ${threadsWithBrandInComments} threads with CloudFuze in comments`)
+    } catch (error) {
+      console.error('   ⚠️ Error checking comments:', error.message)
+    }
+  }
+  
+  // FILTER STEP 3: Final filter including comment check results
+  const beforeExclude = initialFilteredThreads.length
+  const activeThreads = initialFilteredThreads.filter(thread => !shouldExcludeThread(thread, commentCheckResults))
+  console.log(`📊 After excluding CloudFuze in comments: ${activeThreads.length} (removed ${beforeExclude - activeThreads.length})`)
   
   // THEN: Filter for relevance (now all threads have titles)
   const beforeFilter = activeThreads.length

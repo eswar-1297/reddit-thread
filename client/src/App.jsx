@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import Home from './pages/Home'
 import Quora from './pages/Quora'
+import GoogleCommunity from './pages/GoogleCommunity'
 import Bookmarks from './pages/Bookmarks'
 import Navbar from './components/Navbar'
 
@@ -28,6 +29,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home darkMode={darkMode} />} />
             <Route path="/quora" element={<Quora darkMode={darkMode} />} />
+            <Route path="/google-community" element={<GoogleCommunity darkMode={darkMode} />} />
             <Route path="/bookmarks" element={<Bookmarks darkMode={darkMode} />} />
           </Routes>
         </main>
