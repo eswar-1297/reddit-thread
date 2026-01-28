@@ -72,8 +72,8 @@ export async function crossReferenceGoogleCommunitySearch(query, options = {}) {
   const {
     useBing = configuredAPIs.bing,
     useGoogle = configuredAPIs.google,
-    maxVariants = 8,
-    resultsPerQuery = 30,
+    maxVariants = 15,        // Increased for more coverage
+    resultsPerQuery = 30,    // Use pagination to get more results
     limit = 150,
     timeFilter = 'all',
     productFilter = 'all'  // Filter by Google product (drive, gmail, etc.)

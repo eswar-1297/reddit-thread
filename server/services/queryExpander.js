@@ -41,7 +41,14 @@ const queryTemplates = [
   'best way to {query}',               // Best practices
   '{query} problems',                  // Problem-focused
   '{query} experience',                // Experience sharing
-  '{query} recommendations'            // Recommendations
+  '{query} recommendations',           // Recommendations
+  '{query} help',                      // Help format
+  '{query} solution',                  // Solution format
+  '{query} issue',                     // Issue format
+  '{query} question',                  // Question format
+  'can I {query}',                     // Can I format
+  '{query} not working',               // Not working format
+  '{query} alternatives'               // Alternatives
 ]
 
 /**
@@ -120,7 +127,7 @@ function findSynonyms(word) {
 function generateRephrases(query) {
   const variants = []
   
-  // Pattern: "X to Y" -> "from X to Y", "X vs Y", "switching X to Y"
+  // Pattern: "X to Y" -> many variations for migration queries
   const toPattern = /^(.+?)\s+to\s+(.+)$/i
   const toMatch = query.match(toPattern)
   if (toMatch) {
@@ -130,6 +137,16 @@ function generateRephrases(query) {
     variants.push(`switching ${source} to ${target}`)
     variants.push(`${source} to ${target} migration`)
     variants.push(`move from ${source} to ${target}`)
+    variants.push(`transfer ${source} to ${target}`)
+    variants.push(`${source} ${target} sync`)
+    variants.push(`${source} ${target} backup`)
+    variants.push(`${source} ${target} copy files`)
+    variants.push(`switch from ${source} to ${target}`)
+    variants.push(`${source} alternative ${target}`)
+    variants.push(`replace ${source} with ${target}`)
+    variants.push(`${target} instead of ${source}`)
+    variants.push(`moving files ${source} ${target}`)
+    variants.push(`upload ${source} to ${target}`)
   }
   
   // Pattern: "migrate X to Y" -> variations

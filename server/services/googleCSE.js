@@ -126,9 +126,9 @@ export async function searchGoogleCSEWithPagination(query, maxResults = 50) {
 }
 
 /**
- * Search Google CSE with multiple query variants
+ * Search Google CSE with multiple query variants and pagination
  * @param {string[]} queries - Array of search queries
- * @param {number} resultsPerQuery - Max results per query
+ * @param {number} resultsPerQuery - Max results per query (will use pagination if > 10)
  * @param {Object} options - Additional options (dateRestrict, etc.)
  * @returns {Promise<Object>} Combined results from all queries
  */
@@ -136,19 +136,48 @@ export async function searchGoogleCSEMultiQuery(queries, resultsPerQuery = 10, o
   const { dateRestrict = null } = options
   
   console.log(`\n🟢 ========== GOOGLE CSE MULTI-QUERY SEARCH ==========`)
-  console.log(`🟢 Running ${queries.length} queries...${dateRestrict ? ` (dateRestrict: ${dateRestrict})` : ''}`)
+  console.log(`🟢 Running ${queries.length} queries with up to ${resultsPerQuery} results each...`)
+  if (dateRestrict) console.log(`🟢 Date restriction: ${dateRestrict}`)
   
   const allResults = []
   
   for (const query of queries) {
-    const { results, error } = await searchGoogleCSE(query, { num: resultsPerQuery, dateRestrict })
-    
-    if (!error) {
-      allResults.push(...results)
+    // Use pagination if we want more than 10 results per query
+    if (resultsPerQuery > 10) {
+      let start = 1
+      let queryResults = []
+      const maxPages = Math.ceil(Math.min(resultsPerQuery, 30) / 10)  // Max 3 pages (30 results)
+      
+      for (let page = 0; page < maxPages; page++) {
+        const { results, hasMore, error } = await searchGoogleCSE(query, { 
+          num: 10, 
+          start, 
+          dateRestrict 
+        })
+        
+        if (error || results.length === 0) break
+        
+        queryResults.push(...results)
+        
+        if (!hasMore || queryResults.length >= resultsPerQuery) break
+        
+        start += 10
+        // Small delay between pagination requests
+        await new Promise(resolve => setTimeout(resolve, 200))
+      }
+      
+      allResults.push(...queryResults)
+    } else {
+      // Single request for 10 or fewer results
+      const { results, error } = await searchGoogleCSE(query, { num: resultsPerQuery, dateRestrict })
+      
+      if (!error) {
+        allResults.push(...results)
+      }
     }
     
     // Delay between queries to respect rate limits
-    await new Promise(resolve => setTimeout(resolve, 250))
+    await new Promise(resolve => setTimeout(resolve, 300))
   }
   
   console.log(`🟢 Total raw results: ${allResults.length}`)
