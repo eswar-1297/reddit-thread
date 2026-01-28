@@ -264,18 +264,28 @@ const LOCKED_PATTERNS = [
   'this thread has been locked',
   'this post has been locked',
   'this question has been locked',
+  'this question is locked',  // Google Community exact format
+  'this thread is locked',
+  'this post is locked',
   'thread is locked',
   'post is locked',
   'question is locked',
+  'replying has been disabled',  // Google Community exact format
   'replies are disabled',
+  'replies have been disabled',
   'comments are disabled',
+  'comments have been disabled',
+  'responding has been disabled',
   'no longer accepting replies',
   'no longer accepting comments',
   'closed for comments',
   'closed for replies',
   'locked by',
   'this conversation has been locked',
-  'thread locked'
+  'this conversation is locked',
+  'thread locked',
+  'question locked',
+  'post locked'
 ]
 
 // HTML/attribute patterns that indicate locked status
@@ -283,15 +293,22 @@ const LOCKED_HTML_PATTERNS = [
   'data-locked="true"',
   'class="locked"',
   'class="thread-locked"',
+  'class="question-locked"',
   'aria-label="locked"',
   'aria-label="Locked"',
   'lock-icon',
   'locked-badge',
+  'locked-label',
   'is-locked',
   '"isLocked":true',
   '"locked":true',
+  '"state":"locked"',
+  '"threadState":"locked"',
   'data-is-locked',
-  'thread-state-locked'
+  'data-locked',
+  'thread-state-locked',
+  '>Locked<',  // Button/badge text
+  '>locked<'
 ]
 
 /**
