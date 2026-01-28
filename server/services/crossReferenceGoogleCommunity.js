@@ -156,31 +156,41 @@ export async function crossReferenceGoogleCommunitySearch(query, options = {}) {
     )
   }
   
-  // Step 7: Check replies for CloudFuze mentions
-  console.log('\n🔍 Step 7: Checking Google Community replies for CloudFuze mentions...')
+  // Step 7: Check replies for CloudFuze mentions and locked threads
+  console.log('\n🔍 Step 7: Checking Google Community threads for CloudFuze mentions and locked status...')
   
   if (filteredQuestions.length > 0) {
     try {
-      // Check replies in batches (limit to first 30 questions to avoid rate limiting)
-      const urlsToCheck = filteredQuestions.slice(0, 30).map(q => q.url).filter(Boolean)
-      console.log(`   Checking ${urlsToCheck.length} threads for reply mentions...`)
+      // Check threads in batches (limit to first 50 questions to avoid rate limiting)
+      const urlsToCheck = filteredQuestions.slice(0, 50).map(q => q.url).filter(Boolean)
+      console.log(`   Checking ${urlsToCheck.length} threads...`)
       
       const replyCheckResults = await batchCheckGoogleCommunityReplies(urlsToCheck, 3)
       
       const threadsWithBrandInReplies = Array.from(replyCheckResults.values())
         .filter(r => r.hasBrandMention).length
-      console.log(`   Found ${threadsWithBrandInReplies} threads with CloudFuze in replies`)
+      const lockedThreads = Array.from(replyCheckResults.values())
+        .filter(r => r.isLocked).length
       
-      // Filter out threads with CloudFuze in replies
+      console.log(`   Found ${threadsWithBrandInReplies} threads with CloudFuze in replies`)
+      console.log(`   Found ${lockedThreads} locked threads`)
+      
+      // Filter out threads with CloudFuze in replies OR locked threads
       const beforeFilter = filteredQuestions.length
       filteredQuestions = filteredQuestions.filter(q => {
         const checkResult = replyCheckResults.get(q.url)
-        // Keep if: no check result OR check failed OR no brand mention
-        return !checkResult || !checkResult.checked || !checkResult.hasBrandMention
+        // Keep if: no check result OR check failed OR (no brand mention AND not locked)
+        if (!checkResult || !checkResult.checked) {
+          return true // Keep if we couldn't check
+        }
+        // Exclude if brand is mentioned OR thread is locked
+        return !checkResult.hasBrandMention && !checkResult.isLocked
       })
-      console.log(`   After filtering: ${filteredQuestions.length} (removed ${beforeFilter - filteredQuestions.length})`)
+      
+      const removedCount = beforeFilter - filteredQuestions.length
+      console.log(`   After filtering: ${filteredQuestions.length} (removed ${removedCount} - brand: ${threadsWithBrandInReplies}, locked: ${lockedThreads})`)
     } catch (error) {
-      console.error('   ⚠️ Error checking replies:', error.message)
+      console.error('   ⚠️ Error checking threads:', error.message)
       // Continue with unfiltered results on error
     }
   }

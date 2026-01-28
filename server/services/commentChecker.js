@@ -258,6 +258,71 @@ export async function batchCheckQuoraAnswers(urls, concurrency = 3) {
 // GOOGLE COMMUNITY REPLY CHECKER
 // ============================================
 
+// Patterns that indicate a locked Google Community thread
+const LOCKED_PATTERNS = [
+  // Text patterns (case-insensitive match on extracted text)
+  'this thread has been locked',
+  'this post has been locked',
+  'this question has been locked',
+  'thread is locked',
+  'post is locked',
+  'question is locked',
+  'replies are disabled',
+  'comments are disabled',
+  'no longer accepting replies',
+  'no longer accepting comments',
+  'closed for comments',
+  'closed for replies',
+  'locked by',
+  'this conversation has been locked',
+  'thread locked'
+]
+
+// HTML/attribute patterns that indicate locked status
+const LOCKED_HTML_PATTERNS = [
+  'data-locked="true"',
+  'class="locked"',
+  'class="thread-locked"',
+  'aria-label="locked"',
+  'aria-label="Locked"',
+  'lock-icon',
+  'locked-badge',
+  'is-locked',
+  '"isLocked":true',
+  '"locked":true',
+  'data-is-locked',
+  'thread-state-locked'
+]
+
+/**
+ * Check if page HTML indicates the thread is locked
+ * @param {string} html - Raw HTML content
+ * @param {string} text - Extracted text content
+ * @returns {boolean} True if thread appears to be locked
+ */
+function isThreadLocked(html, text) {
+  if (!html && !text) return false
+  
+  const lowerHtml = (html || '').toLowerCase()
+  const lowerText = (text || '').toLowerCase()
+  
+  // Check HTML patterns (these are in the raw HTML, like attributes)
+  for (const pattern of LOCKED_HTML_PATTERNS) {
+    if (lowerHtml.includes(pattern.toLowerCase())) {
+      return true
+    }
+  }
+  
+  // Check text patterns
+  for (const pattern of LOCKED_PATTERNS) {
+    if (lowerText.includes(pattern.toLowerCase())) {
+      return true
+    }
+  }
+  
+  return false
+}
+
 /**
  * Fetch Google Community thread content
  * @param {string} url - Google Community thread URL
@@ -284,31 +349,37 @@ async function fetchGoogleCommunityContent(url) {
 }
 
 /**
- * Check if a Google Community thread has brand mentions in replies
+ * Check if a Google Community thread has brand mentions in replies or is locked
  * @param {string} url - Google Community thread URL
- * @returns {Promise<{hasBrandMention: boolean, checked: boolean}>}
+ * @returns {Promise<{hasBrandMention: boolean, isLocked: boolean, checked: boolean}>}
  */
 export async function checkGoogleCommunityRepliesForBrand(url) {
   const html = await fetchGoogleCommunityContent(url)
   
   if (!html) {
-    return { hasBrandMention: false, checked: false, error: 'Failed to fetch' }
+    return { hasBrandMention: false, isLocked: false, checked: false, error: 'Failed to fetch' }
   }
   
   const text = extractTextFromHtml(html)
   const hasBrandMention = containsBrandMention(text)
+  const isLocked = isThreadLocked(html, text)
+  
+  if (isLocked) {
+    console.log(`   🔒 Locked thread detected: ${url.substring(0, 60)}...`)
+  }
   
   return {
     hasBrandMention,
+    isLocked,
     checked: true
   }
 }
 
 /**
- * Batch check multiple Google Community threads for brand mentions
+ * Batch check multiple Google Community threads for brand mentions and locked status
  * @param {string[]} urls - Array of Google Community URLs
  * @param {number} concurrency - Max concurrent requests (default 3)
- * @returns {Promise<Map<string, {hasBrandMention: boolean, checked: boolean}>>}
+ * @returns {Promise<Map<string, {hasBrandMention: boolean, isLocked: boolean, checked: boolean}>>}
  */
 export async function batchCheckGoogleCommunityReplies(urls, concurrency = 3) {
   const results = new Map()
