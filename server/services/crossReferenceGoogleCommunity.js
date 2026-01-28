@@ -161,11 +161,11 @@ export async function crossReferenceGoogleCommunitySearch(query, options = {}) {
   
   if (filteredQuestions.length > 0) {
     try {
-      // Check threads in batches (limit to first 50 questions to avoid rate limiting)
-      const urlsToCheck = filteredQuestions.slice(0, 50).map(q => q.url).filter(Boolean)
-      console.log(`   Checking ${urlsToCheck.length} threads...`)
+      // Check ALL threads for locked status and brand mentions
+      const urlsToCheck = filteredQuestions.map(q => q.url).filter(Boolean)
+      console.log(`   Checking ${urlsToCheck.length} threads for locked status and brand mentions...`)
       
-      const replyCheckResults = await batchCheckGoogleCommunityReplies(urlsToCheck, 3)
+      const replyCheckResults = await batchCheckGoogleCommunityReplies(urlsToCheck, 5)
       
       const threadsWithBrandInReplies = Array.from(replyCheckResults.values())
         .filter(r => r.hasBrandMention).length

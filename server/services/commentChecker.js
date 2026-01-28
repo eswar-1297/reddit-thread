@@ -291,6 +291,7 @@ const LOCKED_PATTERNS = [
 // HTML/attribute patterns that indicate locked status
 const LOCKED_HTML_PATTERNS = [
   'data-locked="true"',
+  'data-locked="1"',
   'class="locked"',
   'class="thread-locked"',
   'class="question-locked"',
@@ -301,14 +302,28 @@ const LOCKED_HTML_PATTERNS = [
   'locked-label',
   'is-locked',
   '"isLocked":true',
+  '"isLocked":1',
   '"locked":true',
+  '"locked":1',
   '"state":"locked"',
   '"threadState":"locked"',
+  '"questionState":"locked"',
+  '"status":"locked"',
   'data-is-locked',
   'data-locked',
   'thread-state-locked',
   '>Locked<',  // Button/badge text
-  '>locked<'
+  '>locked<',
+  'Locked</span>',
+  'Locked</button>',
+  'Locked</div>',
+  '"Locked"',  // JSON string
+  'lock_outline',  // Material icon name for lock
+  'locked_thread',
+  'thread_locked',
+  'question_locked',
+  'lockIcon',
+  'LockIcon'
 ]
 
 /**
@@ -395,18 +410,27 @@ export async function checkGoogleCommunityRepliesForBrand(url) {
 /**
  * Batch check multiple Google Community threads for brand mentions and locked status
  * @param {string[]} urls - Array of Google Community URLs
- * @param {number} concurrency - Max concurrent requests (default 3)
+ * @param {number} concurrency - Max concurrent requests (default 5)
  * @returns {Promise<Map<string, {hasBrandMention: boolean, isLocked: boolean, checked: boolean}>>}
  */
-export async function batchCheckGoogleCommunityReplies(urls, concurrency = 3) {
+export async function batchCheckGoogleCommunityReplies(urls, concurrency = 5) {
   const results = new Map()
+  const totalBatches = Math.ceil(urls.length / concurrency)
+  let lockedCount = 0
+  let brandCount = 0
   
   for (let i = 0; i < urls.length; i += concurrency) {
+    const batchNum = Math.floor(i / concurrency) + 1
     const batch = urls.slice(i, i + concurrency)
+    
+    // Log progress every 5 batches
+    if (batchNum % 5 === 1 || batchNum === 1) {
+      console.log(`   📊 Progress: batch ${batchNum}/${totalBatches} (${i}/${urls.length} threads checked)`)
+    }
     
     const batchResults = await Promise.all(
       batch.map(async (url) => {
-        await new Promise(resolve => setTimeout(resolve, 200 * (batch.indexOf(url))))
+        await new Promise(resolve => setTimeout(resolve, 100 * (batch.indexOf(url))))
         const result = await checkGoogleCommunityRepliesForBrand(url)
         return { url, result }
       })
@@ -414,13 +438,17 @@ export async function batchCheckGoogleCommunityReplies(urls, concurrency = 3) {
     
     for (const { url, result } of batchResults) {
       results.set(url, result)
+      if (result.isLocked) lockedCount++
+      if (result.hasBrandMention) brandCount++
     }
     
-    // Rate limit between batches
+    // Rate limit between batches (reduced delay for faster processing)
     if (i + concurrency < urls.length) {
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      await new Promise(resolve => setTimeout(resolve, 800))
     }
   }
+  
+  console.log(`   ✅ Finished checking ${urls.length} threads: ${lockedCount} locked, ${brandCount} with brand mentions`)
   
   return results
 }
