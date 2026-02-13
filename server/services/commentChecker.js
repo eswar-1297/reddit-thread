@@ -1,7 +1,8 @@
 // Comment Checker - Check for brand mentions (CloudFuze) in comments/answers across platforms
-// Supports: Reddit, Quora, Google Community
+// Supports: Reddit, Quora, Google Community, Stack Overflow, Microsoft Tech Community
 
 const REDDIT_USER_AGENT = 'RedditThreadFinder/1.0.0'
+const STACK_EXCHANGE_API_BASE = 'https://api.stackexchange.com/2.3'
 const BRAND_KEYWORDS = ['cloudfuze', 'cloud fuze', 'cloud-fuze']
 
 /**
@@ -258,7 +259,7 @@ export async function batchCheckQuoraAnswers(urls, concurrency = 3) {
 // GOOGLE COMMUNITY REPLY CHECKER
 // ============================================
 
-// Patterns that indicate a locked Google Community thread
+// Patterns that indicate a locked thread (Google Community, Microsoft Tech, etc.)
 const LOCKED_PATTERNS = [
   // Text patterns (case-insensitive match on extracted text)
   'this thread has been locked',
@@ -285,7 +286,30 @@ const LOCKED_PATTERNS = [
   'this conversation is locked',
   'thread locked',
   'question locked',
-  'post locked'
+  'post locked',
+  // Microsoft specific patterns
+  'locked question',
+  'migrated from',
+  'was migrated from',
+  'question was migrated',
+  'migrated from the microsoft',
+  'can\'t add comments or replies',
+  'cannot add comments or replies',
+  'you can\'t add comments',
+  'you cannot add comments',
+  'you can vote on whether it\'s helpful, but you can\'t add',
+  'can\'t add comments or replies or follow',
+  // RETIRED questions
+  'retired',
+  'this question has been retired',
+  'question has been retired',
+  'has been retired',
+  'content has been retired',
+  'this content has been retired',
+  'retired question',
+  'retired content',
+  'question you\'re looking for has been retired',
+  'we\'re not migrating all the content'
 ]
 
 // HTML/attribute patterns that indicate locked status
@@ -306,6 +330,15 @@ const LOCKED_HTML_PATTERNS = [
   '"locked":true',
   '"locked":1',
   '"state":"locked"',
+  // Microsoft specific HTML patterns
+  'locked-question',
+  'question-locked',
+  'migrated-question',
+  'is-migrated',
+  'data-migrated',
+  'lia-component-locked',
+  'lia-locked-post',
+  'c-uhf-locked',
   '"threadState":"locked"',
   '"questionState":"locked"',
   '"status":"locked"',
@@ -358,7 +391,7 @@ function isThreadLocked(html, text) {
 /**
  * Fetch Google Community thread content
  * @param {string} url - Google Community thread URL
- * @returns {Promise<string|null>} Page content or null
+ * @returns {Promise<{html: string|null, is404: boolean}>} Page content and 404 status
  */
 async function fetchGoogleCommunityContent(url) {
   try {
@@ -370,26 +403,45 @@ async function fetchGoogleCommunityContent(url) {
       }
     })
     
-    if (!response.ok) return null
+    // Check for HTTP 404
+    if (response.status === 404) {
+      return { html: null, is404: true }
+    }
+    
+    if (!response.ok) return { html: null, is404: false }
     
     const html = await response.text()
-    return html
+    
+    // Check for soft 404 (page exists but shows "not found" message)
+    const is404 = html.includes("Sorry, this page can't be found") ||
+                  html.includes("page doesn't exist") ||
+                  html.includes("This page does not exist") ||
+                  html.includes("Page not found") ||
+                  html.includes("404") && html.includes("not found")
+    
+    return { html: is404 ? null : html, is404 }
   } catch (error) {
     console.log(`   ⚠️ Error fetching Google Community page: ${error.message}`)
-    return null
+    return { html: null, is404: false }
   }
 }
 
 /**
- * Check if a Google Community thread has brand mentions in replies or is locked
+ * Check if a Google Community thread has brand mentions in replies, is locked, or is 404
  * @param {string} url - Google Community thread URL
- * @returns {Promise<{hasBrandMention: boolean, isLocked: boolean, checked: boolean}>}
+ * @returns {Promise<{hasBrandMention: boolean, isLocked: boolean, is404: boolean, checked: boolean}>}
  */
 export async function checkGoogleCommunityRepliesForBrand(url) {
-  const html = await fetchGoogleCommunityContent(url)
+  const { html, is404 } = await fetchGoogleCommunityContent(url)
+  
+  // If page doesn't exist (404), mark it for filtering
+  if (is404) {
+    console.log(`   ❌ 404 page detected: ${url.substring(0, 60)}...`)
+    return { hasBrandMention: false, isLocked: true, is404: true, checked: true }
+  }
   
   if (!html) {
-    return { hasBrandMention: false, isLocked: false, checked: false, error: 'Failed to fetch' }
+    return { hasBrandMention: false, isLocked: false, is404: false, checked: false, error: 'Failed to fetch' }
   }
   
   const text = extractTextFromHtml(html)
@@ -403,21 +455,23 @@ export async function checkGoogleCommunityRepliesForBrand(url) {
   return {
     hasBrandMention,
     isLocked,
+    is404: false,
     checked: true
   }
 }
 
 /**
- * Batch check multiple Google Community threads for brand mentions and locked status
+ * Batch check multiple Google Community threads for brand mentions, locked status, and 404s
  * @param {string[]} urls - Array of Google Community URLs
  * @param {number} concurrency - Max concurrent requests (default 5)
- * @returns {Promise<Map<string, {hasBrandMention: boolean, isLocked: boolean, checked: boolean}>>}
+ * @returns {Promise<Map<string, {hasBrandMention: boolean, isLocked: boolean, is404: boolean, checked: boolean}>>}
  */
 export async function batchCheckGoogleCommunityReplies(urls, concurrency = 5) {
   const results = new Map()
   const totalBatches = Math.ceil(urls.length / concurrency)
   let lockedCount = 0
   let brandCount = 0
+  let notFoundCount = 0
   
   for (let i = 0; i < urls.length; i += concurrency) {
     const batchNum = Math.floor(i / concurrency) + 1
@@ -438,7 +492,8 @@ export async function batchCheckGoogleCommunityReplies(urls, concurrency = 5) {
     
     for (const { url, result } of batchResults) {
       results.set(url, result)
-      if (result.isLocked) lockedCount++
+      if (result.is404) notFoundCount++
+      else if (result.isLocked) lockedCount++
       if (result.hasBrandMention) brandCount++
     }
     
@@ -448,7 +503,317 @@ export async function batchCheckGoogleCommunityReplies(urls, concurrency = 5) {
     }
   }
   
-  console.log(`   ✅ Finished checking ${urls.length} threads: ${lockedCount} locked, ${brandCount} with brand mentions`)
+  console.log(`   ✅ Finished checking ${urls.length} threads: ${notFoundCount} not found (404), ${lockedCount} locked, ${brandCount} with brand mentions`)
+  
+  return results
+}
+
+// ============================================
+// STACK OVERFLOW ANSWER CHECKER
+// ============================================
+
+/**
+ * Get Stack Exchange API key parameter if configured
+ * @returns {string}
+ */
+function getStackExchangeApiKeyParam() {
+  const key = process.env.STACKEXCHANGE_API_KEY
+  return key ? `&key=${key}` : ''
+}
+
+/**
+ * Fetch answers for a Stack Overflow question
+ * @param {string} questionId - Question ID
+ * @returns {Promise<Object>} Answers data
+ */
+async function fetchStackOverflowAnswers(questionId) {
+  try {
+    let url = `${STACK_EXCHANGE_API_BASE}/questions/${questionId}/answers?`
+    url += 'site=stackoverflow'
+    url += '&sort=votes'
+    url += '&order=desc'
+    url += '&pagesize=100'
+    url += '&filter=!nNPvSNe7ya' // Include body_markdown
+    url += getStackExchangeApiKeyParam()
+    
+    const response = await fetch(url, {
+      headers: {
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip, deflate'
+      }
+    })
+    
+    if (!response.ok) {
+      return { items: [], error: `HTTP ${response.status}` }
+    }
+    
+    const data = await response.json()
+    return {
+      items: data.items || [],
+      quota_remaining: data.quota_remaining
+    }
+  } catch (error) {
+    console.log(`   ⚠️ Error fetching SO answers for ${questionId}: ${error.message}`)
+    return { items: [], error: error.message }
+  }
+}
+
+/**
+ * Check if a Stack Overflow question has brand mentions in answers
+ * @param {string} questionId - Question ID
+ * @returns {Promise<{hasBrandMention: boolean, checked: boolean, answerCount: number}>}
+ */
+export async function checkStackOverflowAnswersForBrand(questionId) {
+  const result = await fetchStackOverflowAnswers(questionId)
+  
+  if (result.error) {
+    return { hasBrandMention: false, checked: false, answerCount: 0, error: result.error }
+  }
+  
+  const answers = result.items || []
+  let mentionCount = 0
+  
+  for (const answer of answers) {
+    const body = answer.body_markdown || answer.body || ''
+    if (containsBrandMention(body)) {
+      mentionCount++
+    }
+  }
+  
+  return {
+    hasBrandMention: mentionCount > 0,
+    mentionCount,
+    answerCount: answers.length,
+    checked: true
+  }
+}
+
+/**
+ * Batch check multiple Stack Overflow questions for brand mentions in answers
+ * Uses Stack Exchange API's batch endpoint for efficiency
+ * @param {string[]} questionIds - Array of question IDs
+ * @param {number} batchSize - Questions per API request (max 100)
+ * @returns {Promise<Map<string, {hasBrandMention: boolean, checked: boolean}>>}
+ */
+export async function batchCheckStackOverflowAnswers(questionIds, batchSize = 50) {
+  const results = new Map()
+  
+  if (!questionIds.length) return results
+  
+  // Process in batches (Stack Exchange allows up to 100 IDs per request)
+  for (let i = 0; i < questionIds.length; i += batchSize) {
+    const batch = questionIds.slice(i, i + batchSize)
+    const ids = batch.join(';')
+    
+    try {
+      let url = `${STACK_EXCHANGE_API_BASE}/questions/${ids}/answers?`
+      url += 'site=stackoverflow'
+      url += '&sort=votes'
+      url += '&order=desc'
+      url += '&pagesize=100'
+      url += '&filter=!nNPvSNe7ya'
+      url += getStackExchangeApiKeyParam()
+      
+      const response = await fetch(url, {
+        headers: {
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip, deflate'
+        }
+      })
+      
+      if (!response.ok) {
+        // Mark all in batch as unchecked
+        for (const id of batch) {
+          results.set(id, { hasBrandMention: false, checked: false, error: `HTTP ${response.status}` })
+        }
+        continue
+      }
+      
+      const data = await response.json()
+      
+      // Group answers by question ID
+      const answersByQuestion = new Map()
+      for (const answer of (data.items || [])) {
+        const qId = answer.question_id.toString()
+        if (!answersByQuestion.has(qId)) {
+          answersByQuestion.set(qId, [])
+        }
+        answersByQuestion.get(qId).push(answer)
+      }
+      
+      // Check each question's answers for brand mention
+      for (const id of batch) {
+        const answers = answersByQuestion.get(id) || []
+        let hasBrandMention = false
+        
+        for (const answer of answers) {
+          const body = answer.body_markdown || answer.body || ''
+          if (containsBrandMention(body)) {
+            hasBrandMention = true
+            break
+          }
+        }
+        
+        results.set(id, {
+          hasBrandMention,
+          answerCount: answers.length,
+          checked: true
+        })
+      }
+      
+      // Check API quota
+      if (data.quota_remaining !== undefined && data.quota_remaining < 10) {
+        console.warn('   ⚠️ Stack Exchange API quota running low:', data.quota_remaining)
+      }
+      
+    } catch (error) {
+      console.log(`   ⚠️ Error batch checking SO answers: ${error.message}`)
+      // Mark all in batch as unchecked
+      for (const id of batch) {
+        results.set(id, { hasBrandMention: false, checked: false, error: error.message })
+      }
+    }
+    
+    // Rate limit between batches
+    if (i + batchSize < questionIds.length) {
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
+  }
+  
+  return results
+}
+
+// ============================================
+// MICROSOFT TECH COMMUNITY REPLY CHECKER
+// ============================================
+
+/**
+ * Fetch Microsoft Tech Community page content with timeout and retry
+ * @param {string} url - Thread URL
+ * @param {number} timeout - Timeout in ms (default 10000)
+ * @param {number} retries - Number of retries (default 1)
+ * @returns {Promise<{html: string|null, is404: boolean}>} Page content and 404 status
+ */
+async function fetchMicrosoftTechContent(url, timeout = 10000, retries = 1) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), timeout)
+      
+      const response = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Accept-Language': 'en-US,en;q=0.9',
+          'Accept-Encoding': 'gzip, deflate, br',
+          'Connection': 'keep-alive',
+          'Cache-Control': 'no-cache'
+        },
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+      
+      // Check for HTTP 404
+      if (response.status === 404) {
+        return { html: null, is404: true }
+      }
+      
+      if (!response.ok) {
+        if (attempt < retries) continue
+        return { html: null, is404: false }
+      }
+      
+      const html = await response.text()
+      
+      // Check for soft 404 (page exists but shows "not found" message)
+      const is404 = html.includes("Page not found") ||
+                    html.includes("Sorry, we couldn't find") ||
+                    html.includes("does not exist") ||
+                    html.includes("This page is no longer available") ||
+                    (html.includes("404") && html.includes("not found"))
+      
+      return { html: is404 ? null : html, is404 }
+    } catch (error) {
+      if (attempt < retries) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+        continue
+      }
+      console.log(`   ⚠️ Error fetching Microsoft Tech page: ${error.message}`)
+      return { html: null, is404: false }
+    }
+  }
+  return { html: null, is404: false }
+}
+
+/**
+ * Check if a Microsoft Tech Community thread has brand mentions in replies
+ * Also checks if the thread is locked or returns 404
+ * @param {string} url - Thread URL
+ * @returns {Promise<{hasBrandMention: boolean, isLocked: boolean, is404: boolean, checked: boolean}>}
+ */
+export async function checkMicrosoftTechRepliesForBrand(url) {
+  const { html, is404 } = await fetchMicrosoftTechContent(url)
+  
+  // Check for 404 pages first
+  if (is404) {
+    console.log(`   ❌ 404 page detected: ${url.substring(0, 60)}...`)
+    return { hasBrandMention: false, isLocked: true, is404: true, checked: true }
+  }
+  
+  if (!html) {
+    return { hasBrandMention: false, isLocked: false, is404: false, checked: false, error: 'Failed to fetch' }
+  }
+  
+  const text = extractTextFromHtml(html)
+  const hasBrandMention = containsBrandMention(text)
+  const isLocked = isThreadLocked(html, text)
+  
+  return {
+    hasBrandMention,
+    isLocked,
+    is404: false,
+    checked: true
+  }
+}
+
+/**
+ * Batch check multiple Microsoft Tech Community threads
+ * @param {string[]} urls - Array of URLs
+ * @param {number} concurrency - Max concurrent requests
+ * @returns {Promise<Map<string, {hasBrandMention: boolean, isLocked: boolean, is404: boolean, checked: boolean}>>}
+ */
+export async function batchCheckMicrosoftTechReplies(urls, concurrency = 3) {
+  const results = new Map()
+  let lockedCount = 0
+  let brandCount = 0
+  let notFoundCount = 0
+  
+  for (let i = 0; i < urls.length; i += concurrency) {
+    const batch = urls.slice(i, i + concurrency)
+    
+    const batchResults = await Promise.all(
+      batch.map(async (url) => {
+        await new Promise(resolve => setTimeout(resolve, 200 * (batch.indexOf(url))))
+        const result = await checkMicrosoftTechRepliesForBrand(url)
+        return { url, result }
+      })
+    )
+    
+    for (const { url, result } of batchResults) {
+      results.set(url, result)
+      if (result.is404) notFoundCount++
+      else if (result.isLocked) lockedCount++
+      if (result.hasBrandMention) brandCount++
+    }
+    
+    // Rate limit between batches
+    if (i + concurrency < urls.length) {
+      await new Promise(resolve => setTimeout(resolve, 1000))
+    }
+  }
+  
+  console.log(`   ✅ Finished checking ${urls.length} Microsoft threads: ${notFoundCount} not found (404), ${lockedCount} locked, ${brandCount} with brand mentions`)
   
   return results
 }
@@ -497,5 +862,9 @@ export default {
   batchCheckQuoraAnswers,
   checkGoogleCommunityRepliesForBrand,
   batchCheckGoogleCommunityReplies,
+  checkStackOverflowAnswersForBrand,
+  batchCheckStackOverflowAnswers,
+  checkMicrosoftTechRepliesForBrand,
+  batchCheckMicrosoftTechReplies,
   shouldExcludeForBrandMention
 }

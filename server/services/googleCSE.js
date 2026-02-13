@@ -127,6 +127,7 @@ export async function searchGoogleCSEWithPagination(query, maxResults = 50) {
 
 /**
  * Search Google CSE with multiple query variants and pagination
+ * Runs queries in parallel batches for better performance
  * @param {string[]} queries - Array of search queries
  * @param {number} resultsPerQuery - Max results per query (will use pagination if > 10)
  * @param {Object} options - Additional options (dateRestrict, etc.)
@@ -139,14 +140,13 @@ export async function searchGoogleCSEMultiQuery(queries, resultsPerQuery = 10, o
   console.log(`🟢 Running ${queries.length} queries with up to ${resultsPerQuery} results each...`)
   if (dateRestrict) console.log(`🟢 Date restriction: ${dateRestrict}`)
   
-  const allResults = []
-  
-  for (const query of queries) {
-    // Use pagination if we want more than 10 results per query
+  // Helper function to fetch results for a single query with pagination
+  const fetchQueryResults = async (query) => {
+    const queryResults = []
+    
     if (resultsPerQuery > 10) {
       let start = 1
-      let queryResults = []
-      const maxPages = Math.ceil(Math.min(resultsPerQuery, 30) / 10)  // Max 3 pages (30 results)
+      const maxPages = Math.ceil(Math.min(resultsPerQuery, 50) / 10)  // Increased to 5 pages (50 results max)
       
       for (let page = 0; page < maxPages; page++) {
         const { results, hasMore, error } = await searchGoogleCSE(query, { 
@@ -163,21 +163,34 @@ export async function searchGoogleCSEMultiQuery(queries, resultsPerQuery = 10, o
         
         start += 10
         // Small delay between pagination requests
-        await new Promise(resolve => setTimeout(resolve, 200))
+        await new Promise(resolve => setTimeout(resolve, 150))
       }
-      
-      allResults.push(...queryResults)
     } else {
       // Single request for 10 or fewer results
       const { results, error } = await searchGoogleCSE(query, { num: resultsPerQuery, dateRestrict })
-      
       if (!error) {
-        allResults.push(...results)
+        queryResults.push(...results)
       }
     }
     
-    // Delay between queries to respect rate limits
-    await new Promise(resolve => setTimeout(resolve, 300))
+    return queryResults
+  }
+  
+  // Run queries in parallel batches (5 queries at a time to avoid rate limits)
+  const batchSize = 5
+  const allResults = []
+  
+  for (let i = 0; i < queries.length; i += batchSize) {
+    const batch = queries.slice(i, i + batchSize)
+    const batchPromises = batch.map(query => fetchQueryResults(query))
+    const batchResults = await Promise.all(batchPromises)
+    
+    batchResults.forEach(results => allResults.push(...results))
+    
+    // Delay between batches to respect rate limits
+    if (i + batchSize < queries.length) {
+      await new Promise(resolve => setTimeout(resolve, 300))
+    }
   }
   
   console.log(`🟢 Total raw results: ${allResults.length}`)

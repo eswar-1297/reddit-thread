@@ -1,5 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
-import { Search, Bookmark, Sun, Moon, HelpCircle, Users } from 'lucide-react'
+// COMMENTED OUT: Code, Newspaper, Github, Wrench, Rocket icons - temporarily disabled
+import { Search, Bookmark, Sun, Moon, HelpCircle, Users, /* Code, */ Monitor, /* Newspaper, Wrench, Rocket, Github */ } from 'lucide-react'
 
 function Navbar({ darkMode, setDarkMode }) {
   const location = useLocation()
@@ -73,6 +74,95 @@ function Navbar({ darkMode, setDarkMode }) {
               <Users size={18} />
               <span className="hidden sm:inline">Google</span>
             </Link>
+            
+            {/* COMMENTED OUT: Stack Overflow - temporarily disabled */}
+            {/* <Link
+              to="/stackoverflow"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                isActive('/stackoverflow')
+                  ? 'bg-orange-500 text-white'
+                  : darkMode
+                    ? 'text-gray-300 hover:bg-reddit-gray hover:text-white'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <Code size={18} />
+              <span className="hidden sm:inline">Stack</span>
+            </Link> */}
+            
+            <Link
+              to="/microsoft-tech"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                isActive('/microsoft-tech')
+                  ? 'bg-blue-600 text-white'
+                  : darkMode
+                    ? 'text-gray-300 hover:bg-reddit-gray hover:text-white'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <Monitor size={18} />
+              <span className="hidden sm:inline">MS Tech</span>
+            </Link>
+            
+            {/* COMMENTED OUT: Hacker News - temporarily disabled */}
+            {/* <Link
+              to="/hackernews"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                isActive('/hackernews')
+                  ? 'bg-orange-600 text-white'
+                  : darkMode
+                    ? 'text-gray-300 hover:bg-reddit-gray hover:text-white'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <Newspaper size={18} />
+              <span className="hidden sm:inline">HN</span>
+            </Link> */}
+            
+            {/* COMMENTED OUT: Spiceworks - temporarily disabled */}
+            {/* <Link
+              to="/spiceworks"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                isActive('/spiceworks')
+                  ? 'bg-green-600 text-white'
+                  : darkMode
+                    ? 'text-gray-300 hover:bg-reddit-gray hover:text-white'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <Wrench size={18} />
+              <span className="hidden sm:inline">IT</span>
+            </Link> */}
+            
+            {/* COMMENTED OUT: Product Hunt - temporarily disabled */}
+            {/* <Link
+              to="/producthunt"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                isActive('/producthunt')
+                  ? 'bg-orange-500 text-white'
+                  : darkMode
+                    ? 'text-gray-300 hover:bg-reddit-gray hover:text-white'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <Rocket size={18} />
+              <span className="hidden sm:inline">PH</span>
+            </Link> */}
+            
+            {/* COMMENTED OUT: GitHub - temporarily disabled */}
+            {/* <Link
+              to="/github"
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all ${
+                isActive('/github')
+                  ? darkMode ? 'bg-white text-black' : 'bg-gray-800 text-white'
+                  : darkMode
+                    ? 'text-gray-300 hover:bg-reddit-gray hover:text-white'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              }`}
+            >
+              <Github size={18} />
+              <span className="hidden sm:inline">GH</span>
+            </Link> */}
             
             <Link
               to="/bookmarks"

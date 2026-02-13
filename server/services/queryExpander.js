@@ -32,6 +32,7 @@ const synonymMap = {
 
 /**
  * Query templates for different question types
+ * Includes recent/date variations to find newer threads
  */
 const queryTemplates = [
   '{query}',                           // Original query
@@ -48,7 +49,12 @@ const queryTemplates = [
   '{query} question',                  // Question format
   'can I {query}',                     // Can I format
   '{query} not working',               // Not working format
-  '{query} alternatives'               // Alternatives
+  '{query} alternatives',              // Alternatives
+  '{query} 2025',                      // Recent year
+  '{query} 2024',                      // Previous year
+  '{query} recently',                  // Recent discussions
+  '{query} new',                       // New discussions
+  '{query} latest'                     // Latest discussions
 ]
 
 /**

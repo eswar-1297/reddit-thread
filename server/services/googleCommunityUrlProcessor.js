@@ -4,7 +4,7 @@ import { normalizeProductName } from './googleCommunity.js'
 import { containsBrandMention } from './commentChecker.js'
 
 /**
- * Normalize a Google Community URL to a canonical format
+ * Normalize a Google Community URL to a canonical format (includes Groups and Issue Tracker)
  * 
  * @param {string} url - Raw URL
  * @returns {string|null} Normalized URL or null if invalid
@@ -17,15 +17,22 @@ export function normalizeGoogleCommunityUrl(url) {
     const parsed = new URL(url)
     const hostname = parsed.hostname.toLowerCase()
     
-    // Valid Google Community domains
+    // Valid Google Community domains (including Groups and Issue Tracker)
     const validDomains = [
       'support.google.com',
       'productforums.google.com',
-      'googleproductforums.com'
+      'googleproductforums.com',
+      'groups.google.com',
+      'issuetracker.google.com'
     ]
     
     const isValid = validDomains.some(domain => hostname.includes(domain))
     if (!isValid) return null
+    
+    // For Google Groups with hash, keep the hash
+    if (hostname === 'groups.google.com' && parsed.hash) {
+      return `${parsed.origin}${parsed.pathname}${parsed.hash}`
+    }
     
     // Remove tracking parameters but keep essential ones
     const cleanUrl = url.split('?')[0].split('#')[0]
@@ -37,7 +44,7 @@ export function normalizeGoogleCommunityUrl(url) {
 }
 
 /**
- * Validate if a URL is a valid Google Community page
+ * Validate if a URL is a valid Google Community page (includes Groups and Issue Tracker)
  * 
  * @param {string} url - URL to validate
  * @returns {boolean} True if valid Google Community URL
@@ -49,8 +56,21 @@ export function validateGoogleCommunityUrl(url) {
     const parsed = new URL(url)
     const hostname = parsed.hostname.toLowerCase()
     const path = parsed.pathname.toLowerCase()
+    const hash = parsed.hash.toLowerCase()
     
-    // Valid domains
+    // Google Groups - new format
+    if (hostname === 'groups.google.com') {
+      // Valid: /g/GROUP/c/THREAD or /forum/#!topic/
+      return path.includes('/g/') && path.includes('/c/') ||
+             hash.includes('!topic/') || hash.includes('!msg/')
+    }
+    
+    // Google Issue Tracker
+    if (hostname === 'issuetracker.google.com') {
+      return path.includes('/issues/')
+    }
+    
+    // Valid support domains
     const validDomains = [
       'support.google.com',
       'productforums.google.com',
@@ -87,6 +107,32 @@ export function validateGoogleCommunityUrl(url) {
   } catch (error) {
     return false
   }
+}
+
+/**
+ * Estimate if a thread is likely still open based on thread ID
+ * Google thread IDs are roughly sequential - higher = newer
+ * 
+ * Based on analysis:
+ * - Thread IDs around 400,000,000+ are from late 2024/2025
+ * - Thread IDs around 370,000,000+ are from mid 2024
+ * - Thread IDs around 340,000,000+ are from early 2024
+ * - Thread IDs below 300,000,000 are likely 2023 or older
+ * 
+ * @param {string} threadId - Thread ID
+ * @returns {boolean} True if likely recent (within 1 year)
+ */
+export function isLikelyRecentThread(threadId) {
+  if (!threadId) return true // Can't determine, let it through
+  
+  const id = parseInt(threadId, 10)
+  if (isNaN(id)) return true
+  
+  // Thread IDs above 300 million are from 2024+ (within 1 year)
+  // Thread IDs below 300 million are likely older than 1 year
+  const ONE_YEAR_THRESHOLD = 300000000  // ~early 2024
+  
+  return id >= ONE_YEAR_THRESHOLD
 }
 
 /**

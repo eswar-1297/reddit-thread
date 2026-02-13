@@ -3,6 +3,14 @@ import { useState, useEffect } from 'react'
 import Home from './pages/Home'
 import Quora from './pages/Quora'
 import GoogleCommunity from './pages/GoogleCommunity'
+// COMMENTED OUT: Stack Overflow, Hacker News, GitHub - temporarily disabled
+// import StackOverflow from './pages/StackOverflow'
+import MicrosoftTech from './pages/MicrosoftTech'
+// import HackerNews from './pages/HackerNews'
+// COMMENTED OUT: Spiceworks and Product Hunt - temporarily disabled
+// import Spiceworks from './pages/Spiceworks'
+// import ProductHunt from './pages/ProductHunt'
+// import GitHub from './pages/GitHub'
 import Bookmarks from './pages/Bookmarks'
 import Navbar from './components/Navbar'
 
@@ -30,6 +38,14 @@ function App() {
             <Route path="/" element={<Home darkMode={darkMode} />} />
             <Route path="/quora" element={<Quora darkMode={darkMode} />} />
             <Route path="/google-community" element={<GoogleCommunity darkMode={darkMode} />} />
+            {/* COMMENTED OUT: Stack Overflow, Hacker News, GitHub - temporarily disabled */}
+            {/* <Route path="/stackoverflow" element={<StackOverflow darkMode={darkMode} />} /> */}
+            <Route path="/microsoft-tech" element={<MicrosoftTech darkMode={darkMode} />} />
+            {/* <Route path="/hackernews" element={<HackerNews darkMode={darkMode} />} /> */}
+            {/* COMMENTED OUT: Spiceworks and Product Hunt - temporarily disabled */}
+            {/* <Route path="/spiceworks" element={<Spiceworks darkMode={darkMode} />} /> */}
+            {/* <Route path="/producthunt" element={<ProductHunt darkMode={darkMode} />} /> */}
+            {/* <Route path="/github" element={<GitHub darkMode={darkMode} />} /> */}
             <Route path="/bookmarks" element={<Bookmarks darkMode={darkMode} />} />
           </Routes>
         </main>

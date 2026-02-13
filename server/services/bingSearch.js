@@ -124,12 +124,13 @@ export async function searchBingWithPagination(query, maxResults = 100) {
 
 /**
  * Search Bing with multiple query variants
+ * Runs queries in parallel batches for better performance
  * @param {string[]} queries - Array of search queries
- * @param {number} resultsPerQuery - Max results per query
+ * @param {number} resultsPerQuery - Max results per query (max 50)
  * @param {Object} options - Additional options (freshness, etc.)
  * @returns {Promise<Object>} Combined results from all queries
  */
-export async function searchBingMultiQuery(queries, resultsPerQuery = 20, options = {}) {
+export async function searchBingMultiQuery(queries, resultsPerQuery = 50, options = {}) {
   // Skip early if no API key
   if (!process.env.BING_API_KEY) {
     console.log('🔵 Bing: Skipping (no API key configured)')
@@ -139,16 +140,33 @@ export async function searchBingMultiQuery(queries, resultsPerQuery = 20, option
   const { freshness = null } = options
   
   console.log(`\n🔵 ========== BING MULTI-QUERY SEARCH ==========`)
-  console.log(`🔵 Running ${queries.length} queries...${freshness ? ` (freshness: ${freshness})` : ''}`)
+  console.log(`🔵 Running ${queries.length} queries with up to ${resultsPerQuery} results each...`)
+  if (freshness) console.log(`🔵 Freshness filter: ${freshness}`)
   
+  // Helper function to fetch results for a single query
+  const fetchQueryResults = async (query) => {
+    const { results } = await searchBing(query, { 
+      count: Math.min(resultsPerQuery, 50),  // Bing max is 50 per request
+      freshness 
+    })
+    return results
+  }
+  
+  // Run queries in parallel batches (8 queries at a time - Bing is more lenient)
+  const batchSize = 8
   const allResults = []
   
-  for (const query of queries) {
-    const { results } = await searchBing(query, { count: resultsPerQuery, freshness })
-    allResults.push(...results)
+  for (let i = 0; i < queries.length; i += batchSize) {
+    const batch = queries.slice(i, i + batchSize)
+    const batchPromises = batch.map(query => fetchQueryResults(query))
+    const batchResults = await Promise.all(batchPromises)
     
-    // Small delay between queries
-    await new Promise(resolve => setTimeout(resolve, 200))
+    batchResults.forEach(results => allResults.push(...results))
+    
+    // Delay between batches to respect rate limits
+    if (i + batchSize < queries.length) {
+      await new Promise(resolve => setTimeout(resolve, 200))
+    }
   }
   
   console.log(`🔵 Total raw results: ${allResults.length}`)

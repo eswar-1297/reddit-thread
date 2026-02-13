@@ -116,6 +116,186 @@ export async function searchGoogleCommunityQuestions({
   return response.json()
 }
 
+// COMMENTED OUT: Stack Overflow search - temporarily disabled
+// export async function searchStackOverflowQuestions({
+//   query,
+//   limit = 150,
+//   useStackExchange = true,
+//   useBing = true,
+//   useGoogle = true,
+//   timeFilter = 'all',
+//   tags = '',
+//   minScore = 0,
+//   minAnswers = 0
+// }) {
+//   const params = new URLSearchParams({
+//     q: query,
+//     limit: limit.toString(),
+//     stackexchange: useStackExchange.toString(),
+//     bing: useBing.toString(),
+//     google: useGoogle.toString(),
+//     time: timeFilter,
+//     ...(tags && { tags }),
+//     minScore: minScore.toString(),
+//     minAnswers: minAnswers.toString()
+//   })
+//
+//   const response = await fetch(`${API_BASE}/search/stackoverflow?${params}`)
+//   
+//   if (!response.ok) {
+//     const error = await response.json()
+//     throw new Error(error.message || 'Failed to search Stack Overflow questions')
+//   }
+//   
+//   return response.json()
+// }
+
+// Microsoft Tech Community search using Bing + Google CSE
+export async function searchMicrosoftTechQuestions({
+  query,
+  limit = 150,
+  useBing = true,
+  useGoogle = true,
+  timeFilter = 'all',
+  productFilter = 'all'
+}) {
+  const params = new URLSearchParams({
+    q: query,
+    limit: limit.toString(),
+    bing: useBing.toString(),
+    google: useGoogle.toString(),
+    time: timeFilter,
+    product: productFilter
+  })
+
+  const response = await fetch(`${API_BASE}/search/microsoft-tech?${params}`)
+  
+  if (!response.ok) {
+    const error = await response.json()
+    throw new Error(error.message || 'Failed to search Microsoft Tech Community')
+  }
+  
+  return response.json()
+}
+
+// COMMENTED OUT: Hacker News search - temporarily disabled
+// export async function searchHackerNewsStories({
+//   query,
+//   limit = 150,
+//   useHackerNews = true,
+//   useBing = true,
+//   useGoogle = true,
+//   timeFilter = 'all',
+//   storyType = 'all',
+//   minPoints = 0
+// }) {
+//   const params = new URLSearchParams({
+//     q: query,
+//     limit: limit.toString(),
+//     hn: useHackerNews.toString(),
+//     bing: useBing.toString(),
+//     google: useGoogle.toString(),
+//     time: timeFilter,
+//     type: storyType,
+//     minPoints: minPoints.toString()
+//   })
+//
+//   const response = await fetch(`${API_BASE}/search/hackernews?${params}`)
+//   
+//   if (!response.ok) {
+//     const error = await response.json()
+//     throw new Error(error.message || 'Failed to search Hacker News')
+//   }
+//   
+//   return response.json()
+// }
+
+// COMMENTED OUT: Spiceworks search - temporarily disabled
+// export async function searchSpiceworksTopics({
+//   query,
+//   limit = 150,
+//   useBing = true,
+//   useGoogle = true,
+//   timeFilter = 'all',
+//   categoryFilter = 'all'
+// }) {
+//   const params = new URLSearchParams({
+//     q: query,
+//     limit: limit.toString(),
+//     bing: useBing.toString(),
+//     google: useGoogle.toString(),
+//     time: timeFilter,
+//     category: categoryFilter
+//   })
+//
+//   const response = await fetch(`${API_BASE}/search/spiceworks?${params}`)
+//   
+//   if (!response.ok) {
+//     const error = await response.json()
+//     throw new Error(error.message || 'Failed to search Spiceworks')
+//   }
+//   
+//   return response.json()
+// }
+
+// COMMENTED OUT: Product Hunt search - temporarily disabled
+// export async function searchProductHuntPosts({
+//   query,
+//   limit = 150,
+//   useBing = true,
+//   useGoogle = true,
+//   timeFilter = 'all',
+//   contentType = 'all'
+// }) {
+//   const params = new URLSearchParams({
+//     q: query,
+//     limit: limit.toString(),
+//     bing: useBing.toString(),
+//     google: useGoogle.toString(),
+//     time: timeFilter,
+//     type: contentType
+//   })
+//
+//   const response = await fetch(`${API_BASE}/search/producthunt?${params}`)
+//   
+//   if (!response.ok) {
+//     const error = await response.json()
+//     throw new Error(error.message || 'Failed to search Product Hunt')
+//   }
+//   
+//   return response.json()
+// }
+
+// COMMENTED OUT: GitHub Discussions search - temporarily disabled
+// export async function searchGitHubItems({
+//   query,
+//   limit = 150,
+//   useGitHub = true,
+//   useBing = true,
+//   useGoogle = true,
+//   timeFilter = 'all',
+//   contentType = 'all'
+// }) {
+//   const params = new URLSearchParams({
+//     q: query,
+//     limit: limit.toString(),
+//     gh: useGitHub.toString(),
+//     bing: useBing.toString(),
+//     google: useGoogle.toString(),
+//     time: timeFilter,
+//     type: contentType
+//   })
+//
+//   const response = await fetch(`${API_BASE}/search/github?${params}`)
+//   
+//   if (!response.ok) {
+//     const error = await response.json()
+//     throw new Error(error.message || 'Failed to search GitHub')
+//   }
+//   
+//   return response.json()
+// }
+
 export async function getBookmarks() {
   const response = await fetch(`${API_BASE}/bookmarks`)
   
